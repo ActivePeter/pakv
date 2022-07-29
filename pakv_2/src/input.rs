@@ -4,6 +4,7 @@ use std::sync;
 use crate::pakv::UserKvOpe;
 use clap::{App, ArgMatches, Arg, Command,arg};
 use std::ops::Index;
+use std::sync::mpsc::RecvError;
 
 pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
     let app = App::new("MyApp")
@@ -77,22 +78,30 @@ pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
                 // write!(std::io::stdout(), "Pong").map_err(|e| e.to_string())?;
                 // std::io::stdout().flush().map_err(|e| e.to_string())?;
             }
-            // Some(("set", _matches)) => {
-            //     let k_=_matches.get_one::<String>("K");
-            //     let v_=_matches.get_one::<String>("V");
-            //     if let (Some(k), Some(v)) = (k_,v_) {
-            //         sender.send(UserKvOpe::KvOpeSet {
-            //             k:k.clone(),
-            //             v:v.clone()
-            //         });
-            //         // Ok(Card::new(face, suit))
-            //     } else {
-            //         println!("wrong set arg");
-            //         // Err(())
-            //     }
-            //     // write!(std::io::stdout(), "Pong").map_err(|e| e.to_string())?;
-            //     // std::io::stdout().flush().map_err(|e| e.to_string())?;
-            // }
+            Some(("del", _matches)) => {
+                let k_=_matches.get_one::<String>("K");
+
+                if let (Some(k)) = k_ {
+                    let (tx,rx)
+                        =UserKvOpe::create_del_chan();
+                    sender.send(UserKvOpe::KvOpeDel {
+                        k:k.clone(),
+                        // v:v.clone()
+                        resp: tx
+                    });
+                    if let Ok(true)=rx.recv(){
+                        println!("remove succ");
+                    }else{
+                        println!("not found k {}",k);
+                    }
+                    // Ok(Card::new(face, suit))
+                } else {
+                    println!("wrong set arg");
+                    // Err(())
+                }
+                // write!(std::io::stdout(), "Pong").map_err(|e| e.to_string())?;
+                // std::io::stdout().flush().map_err(|e| e.to_string())?;
+            }
             _ => {println!("no cmd matches");}
 
         }
