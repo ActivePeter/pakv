@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, File, read_dir};
 use std::{fs, thread};
 use std::io::{Error, Read, Write, Seek, Cursor, SeekFrom};
 use std::sync;
-use crate::file::{file_check, KvOpe, KvOpeE, LogFileId, FilePos};
+use crate::file::{file_check, KvOpe, KvOpeE, LogFileId, FilePos, MetaFileOpe};
 use std::sync::mpsc::{RecvError, Sender, Receiver};
 use crate::file;
 
@@ -50,6 +50,13 @@ pub enum UserKvOpe{
     },
     KvOpeGet{k:String,
         resp:sync::mpsc::Sender<Option<String>>},
+    SysKvOpeBatchUpdate{
+        fid:LogFileId,map_k2pos:HashMap<String,u64>,
+        resp:Sender<bool>
+    },
+    SysKvOpeCompactEnd{
+
+    }
 }
 impl UserKvOpe{
     pub fn create_get_chan() -> (Sender<Option<String>>, Receiver<Option<String>>) {
@@ -70,15 +77,46 @@ impl UserKvOpe{
         c
     }
 }
+
+#[derive(Clone)]
+pub struct PaKVCtxChannelCaller{
+    worker_sendin_chan:sync::mpsc::Sender<UserKvOpe>
+}
+impl PaKVCtxChannelCaller{
+    pub fn update_k_positions(&self, fid:LogFileId, map_k2pos:HashMap<String,u64>) -> Receiver<bool> {
+        //receive end and notify from;
+        let (tx,rx):(Sender<bool>,Receiver<bool>)=sync::mpsc::channel();
+
+        self.worker_sendin_chan.send(UserKvOpe::SysKvOpeBatchUpdate { fid, map_k2pos ,
+            resp:tx
+        });
+
+        rx
+    }
+    pub fn end_compact(&self){
+        self.worker_sendin_chan.send(UserKvOpe::SysKvOpeCompactEnd {});
+    }
+}
+
 pub struct PaKVCtx{
     pub store:KVStore,
     pub tarfid:LogFileId,//使用前已经确保文件可写
+    pub channel_caller:PaKVCtxChannelCaller,
+    pub compacting:bool,//标记compact，compact期间，需要将操作存入特殊位置
+    pub user_opek_whencompact:HashSet<String>,
+    pub meta_file_ope:MetaFileOpe
 }
 impl PaKVCtx{
-    pub fn create() -> PaKVCtx {
+    pub fn create(worker_sendin_chan:sync::mpsc::Sender<UserKvOpe>) -> PaKVCtx {
         return PaKVCtx{
             store: KVStore::create(),
-            tarfid: LogFileId{ id: 1 }
+            tarfid: LogFileId{ id: 1 },
+            channel_caller:PaKVCtxChannelCaller{
+                worker_sendin_chan
+            },
+            compacting: false,
+            user_opek_whencompact: Default::default(),
+            meta_file_ope:MetaFileOpe::create()
         }
     }
 
@@ -90,13 +128,16 @@ impl PaKVCtx{
             //1.log
             let pos=file::file_append_log(&self.tarfid.get_pathbuf(),ope.to_line_str().unwrap()).unwrap();
             //2.mem
-            self.store.set(k, &FilePos {
+            self.store.set(k.clone(), &FilePos {
                 file_id: self.tarfid.id,
                 pos
             });
 
-
-
+        if self.compacting{
+            self.user_opek_whencompact.insert(k);
+        }else{
+            file::CompactCtx::compact_ifneed(self,pos);
+        }
         // self.append_log(ope.to_line_str().unwrap());
 
     }
@@ -105,9 +146,18 @@ impl PaKVCtx{
         let ope=KvOpe{
             ope: KvOpeE::KvOpeDel {k:k.clone()}
         };
+        let mut ret=None;
         let pos=file::file_append_log(&self.tarfid.get_pathbuf(),ope.to_line_str().unwrap()).unwrap();
         // self.append_log(ope.to_line_str().unwrap());
-        self.store.del(k)
+        ret=self.store.del(k.clone());
+
+        if self.compacting{
+            self.user_opek_whencompact.insert(k);
+        }else{
+            file::CompactCtx::compact_ifneed(self,pos);
+        }
+
+        ret
     }
     pub fn get(&self, k:String) -> Option<String> {
         let res=self.store.get(k);
@@ -139,12 +189,12 @@ impl PaKVCtx{
     }
 }
 pub fn start_kernel() -> Sender<UserKvOpe> {
-    let mut ctx=PaKVCtx::create();
-    file::file_check(&mut ctx);
     let (tx,rx)
         :(sync::mpsc::Sender<UserKvOpe>,
           sync::mpsc::Receiver<UserKvOpe>)
         =sync::mpsc::channel();
+    let mut ctx=PaKVCtx::create(tx.clone());
+    file::file_check(&mut ctx);
     fn handle_ope(ctx:&mut PaKVCtx, ope:UserKvOpe){
         match ope{
             UserKvOpe::KvOpeSet {
@@ -171,6 +221,22 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
                         resp.send(Some(v.clone()));
                     }
                 }
+            }
+            UserKvOpe::SysKvOpeBatchUpdate {fid,map_k2pos,resp  } => {
+                ctx.compacting=true;
+                for (k,pos) in map_k2pos{
+                    if !ctx.user_opek_whencompact.contains(&k) {
+                        ctx.store.set(k, &FilePos {
+                            file_id: fid.id,
+                            pos
+                        })
+                    }
+                }
+                resp.send(true);
+            }
+            UserKvOpe::SysKvOpeCompactEnd { .. } => {
+                ctx.compacting=false;
+                ctx.user_opek_whencompact.clear();
             }
         }
     }

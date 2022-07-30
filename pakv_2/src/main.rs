@@ -2,6 +2,7 @@ mod pakv;
 mod cmd;
 mod input;
 mod file;
+mod test;
 
 
 fn main() {
