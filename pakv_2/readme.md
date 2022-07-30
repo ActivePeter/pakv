@@ -6,11 +6,11 @@ command line.
 **Goals**:
 
 - Handle and report errors robustly
-- Use serde for serialization
-- Write data to disk as a log using standard file APIs
-- Read the state of the key/value store from disk
-- Map in-memory key-indexes to on-disk values
-- Periodically compact the log to remove stale data
+- x Use serde for serialization
+- x Write data to disk as a log using standard file APIs
+- x Read the state of the key/value store from disk
+- x Map in-memory key-indexes to on-disk values
+- x Periodically compact the log to remove stale data
 
 **Topics**: log-structured file I/O, bitcask, the `failure` crate, `Read` /
 `Write` traits, the `serde` crate.

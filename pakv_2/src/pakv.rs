@@ -1,11 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use std::fs::{OpenOptions, File, read_dir};
-use std::{fs, thread};
-use std::io::{Error, Read, Write, Seek, Cursor, SeekFrom};
+use std::{ thread};
 use std::sync;
-use crate::file::{file_check, KvOpe, KvOpeE, LogFileId, FilePos, MetaFileOpe};
-use std::sync::mpsc::{RecvError, Sender, Receiver};
+use crate::file::{KvOpe, KvOpeE, LogFileId, FilePos, MetaFileOpe};
+use std::sync::mpsc::{ Sender, Receiver};
 use crate::file;
 
 
@@ -29,7 +26,7 @@ impl KVStore{
     //     }
     // }
     pub fn set(&mut self,k:String,v:&FilePos){
-        self.map.entry(k).and_modify(|mut v1|{
+        self.map.entry(k).and_modify(| v1|{
             *v1= (*v).clone();
         }).or_insert( (*v).clone());
     }
@@ -89,12 +86,12 @@ impl PaKVCtxChannelCaller{
 
         self.worker_sendin_chan.send(UserKvOpe::SysKvOpeBatchUpdate { fid, map_k2pos ,
             resp:tx
-        });
+        }).unwrap();
 
         rx
     }
     pub fn end_compact(&self){
-        self.worker_sendin_chan.send(UserKvOpe::SysKvOpeCompactEnd {});
+        self.worker_sendin_chan.send(UserKvOpe::SysKvOpeCompactEnd {}).unwrap();
     }
 }
 
@@ -146,10 +143,9 @@ impl PaKVCtx{
         let ope=KvOpe{
             ope: KvOpeE::KvOpeDel {k:k.clone()}
         };
-        let mut ret=None;
         let pos=file::file_append_log(&self.tarfid.get_pathbuf(),ope.to_line_str().unwrap()).unwrap();
         // self.append_log(ope.to_line_str().unwrap());
-        ret=self.store.del(k.clone());
+        let ret=self.store.del(k.clone());
 
         if self.compacting{
             self.user_opek_whencompact.insert(k);
@@ -174,7 +170,7 @@ impl PaKVCtx{
                     let ope=KvOpe::from_str(&*l);
                     if let Ok(v)=ope{
                         match v.ope{
-                            KvOpeE::KvOpeSet { k,  v } => {
+                            KvOpeE::KvOpeSet { k:_,  v } => {
                                 return Some(v);
                             }
                             _=>{
@@ -204,10 +200,10 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
             UserKvOpe::KvOpeDel { k,resp } => {
                 match ctx.del(k){
                     None => {
-                        resp.send(false);
+                        resp.send(false).unwrap();
                     }
                     Some(_) => {
-                        resp.send(true);
+                        resp.send(true).unwrap();
                     }
                 }
             }
@@ -215,10 +211,10 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
                 k,resp } => {
                 match ctx.get(k){
                     None => {
-                        resp.send(None);
+                        resp.send(None).unwrap();
                     }
                     Some(v) => {
-                        resp.send(Some(v.clone()));
+                        resp.send(Some(v.clone())).unwrap();
                     }
                 }
             }
@@ -232,7 +228,7 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
                         })
                     }
                 }
-                resp.send(true);
+                resp.send(true).unwrap();
             }
             UserKvOpe::SysKvOpeCompactEnd { .. } => {
                 ctx.compacting=false;
@@ -240,7 +236,7 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
             }
         }
     }
-    let handle = thread::spawn(move || {
+    let _handle = thread::spawn(move || {
         loop {
             let r=rx.recv();
             match r{

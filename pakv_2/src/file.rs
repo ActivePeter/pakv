@@ -1,15 +1,12 @@
 use std::path::{Path, PathBuf};
-use std::fs::{OpenOptions, read_dir, File, DirEntry, Metadata};
+use std::fs::{OpenOptions, read_dir, File};
 use std::io::{BufReader, BufRead, Write, Seek, SeekFrom, Read};
 use crate::pakv::{PaKVCtx, PaKVCtxChannelCaller};
 use serde::{Serialize, Deserialize};
-use serde_json::Error;
-use std::char::MAX;
+// use serde_json::Error;
 use std::{fs, slice};
-use std::cmp::max;
 use std::collections::{HashMap, BTreeMap};
-use std::ops::Deref;
-use std::borrow::BorrowMut;
+// use std::error::Error;
 // use std::intrinsics::add_with_overflow;
 
 // use std::str;
@@ -68,9 +65,9 @@ impl FilePos {
         match f {
             Ok(ff) => {
                 let mut reader = BufReader::new(ff);
-                reader.seek(SeekFrom::Start(self.pos));
+                reader.seek(SeekFrom::Start(self.pos)).unwrap();
                 let mut s = String::new();
-                reader.read_line(&mut s);
+                reader.read_line(&mut s).unwrap();
                 return Some(s);
             }
             Err(e) => {
@@ -98,7 +95,7 @@ impl LogFileId {
     pub fn from_path(p: PathBuf) -> Option<LogFileId> {
         let mut s = p.file_name().unwrap().to_str().unwrap();
         // println!("parsing {}",s);
-        let mut i_ = s.find(".kv");
+        let i_ = s.find(".kv");
         match i_ {
             Some(i) => {
                 let ptr = s.as_ptr();
@@ -129,7 +126,7 @@ impl LogFileId {
     pub fn set_by_logfile_path(&mut self, path: &PathBuf) -> bool {
         let mut s = path.file_name().unwrap().to_str().unwrap();
         // println!("parsing {}",s);
-        let mut i_ = s.find(".kv");
+        let i_ = s.find(".kv");
         if let Some(i)=i_{
             let ptr = s.as_ptr();
             // i = max(i,0);
@@ -150,7 +147,9 @@ impl LogFileId {
     }
 
     pub fn touch_if_not_exist(&self) {
-        OpenOptions::new().create(true).write(true).open(self.get_pathbuf());
+        if let Err(e)=OpenOptions::new().create(true).write(true).open(self.get_pathbuf()){
+            eprintln!("{}",e);
+        }
     }
     // pub fn begin_read(&self){
     //     let file=OpenOptions::new().read(true).open(self.get_pathbuf());
@@ -195,7 +194,7 @@ pub fn file_append_log(filepath: &PathBuf, mut str: String) -> Option<u64> {
     //         panic!("tar path is not chosen");
     //     }
     //     Some(p) => {
-    let mut filer = OpenOptions::new()
+    let filer = OpenOptions::new()
         .write(true)
         .append(true)
         .open(filepath);
@@ -216,13 +215,11 @@ pub fn file_append_log(filepath: &PathBuf, mut str: String) -> Option<u64> {
             //     eprintln!("Couldn't write to file: {}", e);
             // }
         }
-        Err(_) => {
-            panic!("open tar file failed")
+        Err(e) => {
+            panic!("open tar file failed {}",e);
         }
     }
 
-    // }
-    None
 }
 
 const LOG_FILE_MAX:u64 =1 << 20;
@@ -284,9 +281,9 @@ impl CompactCtx {
             if let Ok(f) = OpenOptions::new()
                 .read(true)
                 .open(f_.get_pathbuf()) {
-                logfile_gothroughlogs(&f, |off, line, kvope| {
+                logfile_gothroughlogs(&f, |_, line, kvope| {
                     match &(kvope.ope) {
-                        KvOpeE::KvOpeSet { k, v } => {
+                        KvOpeE::KvOpeSet { k, v:_ } => {
                             map_k2_opestr.entry(k.clone()).and_modify(|ss| {
                                 let mut l = line.clone();
                                 std::mem::swap(&mut l, ss);
@@ -309,7 +306,7 @@ impl CompactCtx {
         let mut map_k2pos = HashMap::new();
         let mut wait =None;
         for (k, opestr) in map_k2_opestr {
-            f.write(opestr.as_bytes());
+            f.write(opestr.as_bytes()).unwrap();
             len += opestr.len();
             map_k2pos.insert(k, len as u64);
             if len> LOG_FILE_MAX as usize {
@@ -326,7 +323,7 @@ impl CompactCtx {
         }
         if let Some(haswait)=wait{
             // println!("waiting update");
-            haswait.recv();//等待索引修改完毕
+            haswait.recv().unwrap();//等待索引修改完毕
             //删除所有旧文件
             for ffid in self.compactfrom_fids{
                 fs::remove_file(ffid.get_pathbuf()).unwrap();
@@ -338,16 +335,16 @@ impl CompactCtx {
     pub fn add_new_compact2_fid(&mut self) {
         let mut max = 0;
         for fid in &self.compactfrom_fids {
-            if (fid.id > max) {
+            if fid.id > max {
                 max = fid.id;
             }
         }
         for fid in &self.compact2_fids {
-            if (fid.id > max) {
+            if fid.id > max {
                 max = fid.id;
             }
         }
-        if (self.tarfid.id > max) {
+        if self.tarfid.id > max {
             max = self.tarfid.id;
         }
         let add = LogFileId {
@@ -409,11 +406,13 @@ impl MetaFileOpe{
     pub fn update2file(store:&MetaFileStore){
         let v=serde_json::to_string(store).unwrap();
         let mut f =OpenOptions::new().write(true).open(Path::new(MetaFileOpe::metafile_path())).unwrap();
-        f.write(v.as_bytes());
+        f.write(v.as_bytes()).unwrap();
     }
 
     pub fn makesure_exist(&self){
-        OpenOptions::new().create(true).write(true).open(Path::new(MetaFileOpe::metafile_path()));
+        if let Err(e)= OpenOptions::new().create(true).write(true).open(Path::new(MetaFileOpe::metafile_path())){
+            eprintln!("{}",e);
+        }
     }
 
     //在更新ctx里的tarfid时要跟着变
@@ -438,7 +437,7 @@ impl MetaFileOpe{
             let mut reader =BufReader::new(f);
             // reader.seek(SeekFrom::Start(0));
             let mut line=String::new();
-            reader.read_to_string(&mut line);
+            reader.read_to_string(&mut line).unwrap();
             // println!("unserial {}",line);
             let r:serde_json::Result<MetaFileStore>=serde_json::from_str(&line);
             match r {
@@ -462,18 +461,12 @@ impl MetaFileOpe{
 pub fn file_check(ctx: &mut PaKVCtx) {
     let path = Path::new(pathstr_of_logfile());
     //1.缓存文件文件夹
-    fs::create_dir(path);
+    if let Err(e)= fs::create_dir(path){
+        eprintln!("{}",e);
+    }
     ctx.meta_file_ope.makesure_exist();
-    let mut tarfid =ctx.meta_file_ope.get_usertar_fid();
-    // META_FILE_OPE.with(|mut f|{
-    //     tarfid=f.get_usertar_fid();
-    // });
-    // OpenOptions::new().create(true).write(true).open(path).unwrap();
+    let tarfid =ctx.meta_file_ope.get_usertar_fid();
 
-    // let meta=dir.metadata().unwrap();
-    // if !meta.is_dir() {
-    //     // panic!("store应该为文件夹");
-    // }
     //3.遍历文件夹下的文件,恢复所有操作到内存，选定一个最小文件为后续持久化文件，
     let r = read_dir(path).unwrap();
     // let mut minfilelen = u64::MAX;
@@ -484,7 +477,7 @@ pub fn file_check(ctx: &mut PaKVCtx) {
             Ok(dir) => {
                 println!("scanning log {}", dir.path().as_os_str().to_str().unwrap());
                 let p = dir.path();
-                let mut file = File::open(&p).unwrap();
+                let file = File::open(&p).unwrap();
                 let mut fileid = LogFileId { id: 0 };
                 if !fileid.set_by_logfile_path(&p){
                     println!("  skip");
@@ -509,12 +502,12 @@ pub fn file_check(ctx: &mut PaKVCtx) {
         }
     }
     fn file_readlogs(ctx:&mut PaKVCtx,fid:LogFileId,file:&mut File){
-        logfile_gothroughlogs(file, |off, line, kvope| {
+        logfile_gothroughlogs(file, |off, _line, kvope| {
             // println!("recover ope {} {}",line_str,off);
             // println!("seek relative {}");
             //恢复操作
             match &kvope.ope {
-                KvOpeE::KvOpeSet { k, v } => {
+                KvOpeE::KvOpeSet { k,v:_ } => {
                     ctx.store.set(k.clone(), &FilePos {
                         file_id: fid.id,
                         pos: off,
@@ -529,7 +522,7 @@ pub fn file_check(ctx: &mut PaKVCtx) {
     let mut tarfile =None;
     let mut latest_fid=0;
     //最新编辑的最后操作
-    for (t,(id, mut file)) in rank_by_edit_time{
+    for (_t,(id, mut file)) in rank_by_edit_time{
         // println!("cur f id {} tarfid {}",id.id,tarfid);
         if id.id==tarfid{//meta中标记的tarfile是否存在
             tarfile=Some(file);

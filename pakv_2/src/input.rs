@@ -2,9 +2,7 @@ use std::io;
 use std::io::Write;
 use std::sync;
 use crate::pakv::UserKvOpe;
-use clap::{App, ArgMatches, Arg, Command,arg};
-use std::ops::Index;
-use std::sync::mpsc::RecvError;
+use clap::{App, Command,arg};
 
 pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
     let app = App::new("MyApp")
@@ -44,7 +42,7 @@ pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
                     sender.send(UserKvOpe::KvOpeSet {
                         k:k.clone(),
                         v:v.clone()
-                    });
+                    }).unwrap();
                     // Ok(Card::new(face, suit))
                 } else {
                     println!("wrong set arg");
@@ -56,14 +54,14 @@ pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
             Some(("get", _matches)) => {
                 let k_=_matches.get_one::<String>("K");
 
-                if let (Some(k)) = (k_) {
+                if let Some(k) = k_ {
                     let (tx,
                         rx)
                         =UserKvOpe::create_get_chan();
                     sender.send(UserKvOpe::KvOpeGet {
                         k:k.clone(),
                         resp:tx
-                    });
+                    }).unwrap();
                     let r=rx.recv();
                     if let Ok(Some(get))=r{
                         println!("found {}",get)
@@ -81,14 +79,14 @@ pub fn input_wait(sender:sync::mpsc::Sender<UserKvOpe>){
             Some(("del", _matches)) => {
                 let k_=_matches.get_one::<String>("K");
 
-                if let (Some(k)) = k_ {
+                if let Some(k) = k_ {
                     let (tx,rx)
                         =UserKvOpe::create_del_chan();
                     sender.send(UserKvOpe::KvOpeDel {
                         k:k.clone(),
                         // v:v.clone()
                         resp: tx
-                    });
+                    }).unwrap();
                     if let Ok(true)=rx.recv(){
                         println!("remove succ");
                     }else{
