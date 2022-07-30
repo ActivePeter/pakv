@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, read_dir, File, DirEntry, Metadata};
-use std::io::{BufReader, BufRead, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufRead, Write, Seek, SeekFrom, Read};
 use crate::pakv::{PaKVCtx, PaKVCtxChannelCaller};
 use serde::{Serialize, Deserialize};
 use serde_json::Error;
@@ -325,12 +325,12 @@ impl CompactCtx {
             }
         }
         if let Some(haswait)=wait{
-            println!("waiting update");
+            // println!("waiting update");
             haswait.recv();//等待索引修改完毕
             //删除所有旧文件
             for ffid in self.compactfrom_fids{
                 fs::remove_file(ffid.get_pathbuf()).unwrap();
-                println!("remove {}",ffid.id);
+                // println!("remove {}",ffid.id);
             }
         }
         self.pakvcaller.end_compact();
@@ -434,13 +434,16 @@ impl MetaFileOpe{
             return v.usertarfid;
         }else{
             //读取并解析成功，则之前有，否则设为默认值
-            let f=OpenOptions::new().write(true).open(Path::new(MetaFileOpe::metafile_path())).unwrap();
+            let f=OpenOptions::new().read(true).open(Path::new(MetaFileOpe::metafile_path())).unwrap();
             let mut reader =BufReader::new(f);
+            // reader.seek(SeekFrom::Start(0));
             let mut line=String::new();
-            reader.read_line(&mut line);
+            reader.read_to_string(&mut line);
+            // println!("unserial {}",line);
             let r:serde_json::Result<MetaFileStore>=serde_json::from_str(&line);
             match r {
                 Ok(v) => {
+                    // println!("  unserial ok");
                     self.store=Some(v);
                     return self.store.as_ref().unwrap().usertarfid;
                 }
@@ -527,6 +530,7 @@ pub fn file_check(ctx: &mut PaKVCtx) {
     let mut latest_fid=0;
     //最新编辑的最后操作
     for (t,(id, mut file)) in rank_by_edit_time{
+        // println!("cur f id {} tarfid {}",id.id,tarfid);
         if id.id==tarfid{//meta中标记的tarfile是否存在
             tarfile=Some(file);
             continue;
