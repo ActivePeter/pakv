@@ -225,7 +225,7 @@ pub fn file_append_log(filepath: &PathBuf, mut str: String) -> Option<u64> {
     None
 }
 
-const LOG_FILE_MAX:u64 =1 << 8;
+const LOG_FILE_MAX:u64 =1 << 20;
 
 //这里存入id前必须保证有效性
 pub struct CompactCtx {
