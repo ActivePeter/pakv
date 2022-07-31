@@ -5,7 +5,7 @@ command line.
 
 **Goals**:
 
-- Handle and report errors robustly
+- x Handle and report errors robustly
 - x Use serde for serialization
 - x Write data to disk as a log using standard file APIs
 - x Read the state of the key/value store from disk

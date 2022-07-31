@@ -84,6 +84,8 @@ channel response：通过传递一个rxchannel
 
 #### 改进空间
 
+string 传递过程中 clone深拷贝
+
 文件io操作
 
 压缩时，压缩用的map中只存文件索引（节约内存，但是会导致写入新文件时，需要去读取，

@@ -3,3 +3,6 @@ pakv_1/target/
 rust/
 pakv_2/target/
 pakv_2/store/
+pakv_3/pakv_client/target/
+pakv_3/pakv_server/target/
+pakv_3/pakv_server/store/
