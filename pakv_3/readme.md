@@ -5,9 +5,9 @@ with synchronous networking over a custom protocol.
 
 **Goals**:
 
-- Create a client-server application
-- Write a custom protocol with `std` networking APIs
-- Introduce logging to the server
+- x Create a client-server application
+- x Write a custom protocol with `std` networking APIs
+- x Introduce logging to the server
 - Implement pluggable backends with traits
 - Benchmark the hand-written backend against `sled`
 

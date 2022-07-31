@@ -8,7 +8,7 @@ mod pakv;
 
 
 fn main() {
-    env_logger::init();
+    env_logger::init();//remember to set RUST_LOG=INFO
     info!("starting up");
     let pakv_chan_handler=pakv::start_kernel();
     server::PaKVServer::new(pakv_chan_handler).start();
