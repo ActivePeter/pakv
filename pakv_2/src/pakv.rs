@@ -1,9 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::{ thread};
 use std::sync;
-use crate::file::{KvOpe, KvOpeE, LogFileId, FilePos, MetaFileOpe};
+use crate::file::{ LogFileId, FilePos};
 use std::sync::mpsc::{ Sender, Receiver};
 use crate::file;
+use crate::file::meta::MetaFileOpe;
+use crate::file::serial::{KvOpe, KvOpeE};
+use crate::file::compact::CompactCtx;
+// use crate::r#mod;
 
 
 pub struct KVStore{
@@ -26,15 +30,16 @@ impl KVStore{
     //     }
     // }
     pub fn set(&mut self,k:String,v:&FilePos){
+        // self.map.get_mut()
         self.map.entry(k).and_modify(| v1|{
             *v1= (*v).clone();
         }).or_insert( (*v).clone());
     }
-    pub fn get(&self, k:String) -> Option<&FilePos> {
-        return self.map.get(&k);
+    pub fn get(&self, k:&String) -> Option<&FilePos> {
+        return self.map.get(k);
     }
-    pub fn del(&mut self, k:String) -> Option<FilePos> {
-        self.map.remove(&k)
+    pub fn del(&mut self, k:&String) -> Option<FilePos> {
+        self.map.remove(k)
     }
 }
 
@@ -123,7 +128,7 @@ impl PaKVCtx{
             ope: KvOpeE::KvOpeSet {k:k.clone(),v:v.clone()}
         };
             //1.log
-            let pos=file::file_append_log(&self.tarfid.get_pathbuf(),ope.to_line_str().unwrap()).unwrap();
+            let pos= file::file_append_log(&self.tarfid.get_pathbuf(), ope.to_line_str().unwrap()).unwrap();
             //2.mem
             self.store.set(k.clone(), &FilePos {
                 file_id: self.tarfid.id,
@@ -133,29 +138,29 @@ impl PaKVCtx{
         if self.compacting{
             self.user_opek_whencompact.insert(k);
         }else{
-            file::CompactCtx::compact_ifneed(self,pos);
+            CompactCtx::compact_ifneed(self, pos);
         }
         // self.append_log(ope.to_line_str().unwrap());
 
     }
-    pub fn del(&mut self, k:String) -> Option<FilePos> {
+    pub fn del(&mut self, k:&String) -> Option<FilePos> {
         //1.log
         let ope=KvOpe{
             ope: KvOpeE::KvOpeDel {k:k.clone()}
         };
-        let pos=file::file_append_log(&self.tarfid.get_pathbuf(),ope.to_line_str().unwrap()).unwrap();
+        let pos= file::file_append_log(&self.tarfid.get_pathbuf(), ope.to_line_str().unwrap()).unwrap();
         // self.append_log(ope.to_line_str().unwrap());
-        let ret=self.store.del(k.clone());
+        let ret=self.store.del(k);
 
         if self.compacting{
-            self.user_opek_whencompact.insert(k);
+            self.user_opek_whencompact.insert(k.clone());
         }else{
-            file::CompactCtx::compact_ifneed(self,pos);
+            CompactCtx::compact_ifneed(self, pos);
         }
 
         ret
     }
-    pub fn get(&self, k:String) -> Option<String> {
+    pub fn get(&self, k:&String) -> Option<String> {
         let res=self.store.get(k);
         match res{
             None => {
@@ -198,7 +203,7 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
                 ctx.set(k,v);
             }
             UserKvOpe::KvOpeDel { k,resp } => {
-                match ctx.del(k){
+                match ctx.del(&k){
                     None => {
                         resp.send(false).unwrap();
                     }
@@ -209,12 +214,12 @@ pub fn start_kernel() -> Sender<UserKvOpe> {
             }
             UserKvOpe::KvOpeGet {
                 k,resp } => {
-                match ctx.get(k){
+                match ctx.get(&k){
                     None => {
                         resp.send(None).unwrap();
                     }
                     Some(v) => {
-                        resp.send(Some(v.clone())).unwrap();
+                        resp.send(Some(v)).unwrap();
                     }
                 }
             }
