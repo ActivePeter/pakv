@@ -38,7 +38,9 @@ impl CompactCtx {
         if curpos < LOG_FILE_MAX {
             return;
         }
+        info!("compact start");
         ctx.compacting=true;
+
         let fromids = scan_log_files();
         // ctx.tarfid.id += 1;
         // ctx.tarfid.touch_if_not_exist();
@@ -47,21 +49,22 @@ impl CompactCtx {
             fromids,
             ctx.sys_chan_caller.clone(),
         );
+
+        info!("change tarfile, compact old files");
         //更新目标id
-        // META_FILE_OPE.with(|file|{
-        //     .set_usertar_fid(compact.tarfid.id);
-        // });
         ctx.meta_file_ope.set_usertar_fid(compact.tarfid.id);
         ctx.tarfid=compact.tarfid.clone();
         ctx.tarfid.touch_if_not_exist();
 
         std::thread::spawn(move || {
+            info!("compact task begin");
             compact.start_compact();
         });
     }
     fn start_compact(mut self) {
         let mut map_k2_opestr: HashMap<String, String> = HashMap::new();
         //1.压缩操作
+        info!("collect compacted info");
         for f_ in &self.compactfrom_fids {
             if let Ok(f) = OpenOptions::new()
                 .read(true)
@@ -84,6 +87,7 @@ impl CompactCtx {
         //2.创建新的文件，并一条条写入
         self.add_new_compact2_fid();
         let mut fid = self.compact2_fids.last_mut().unwrap();
+        info!("create file for compact {}",fid.id);
         let mut f = OpenOptions::new().write(true).open(&fid.get_pathbuf()).unwrap();
 
         let mut len = 0;
@@ -100,16 +104,20 @@ impl CompactCtx {
                 wait=Some(self.pakvcaller.update_k_positions((fid).clone(),sendmap));
                 len=0;
 
+
                 self.add_new_compact2_fid();
                 fid = self.compact2_fids.last_mut().unwrap();
+                info!("create file for compact {}",fid.id);
                 f = OpenOptions::new().write(true).open(&fid.get_pathbuf()).unwrap();
             }
         }
         if let Some(haswait)=wait{
             // println!("waiting update");
             haswait.recv().unwrap();//等待索引修改完毕
+            info!("compact written done");
             //删除所有旧文件
             for ffid in self.compactfrom_fids{
+                info!("remove old {}",ffid.id);
                 fs::remove_file(ffid.get_pathbuf()).unwrap();
                 // println!("remove {}",ffid.id);
             }

@@ -238,7 +238,8 @@ pub fn file_check(ctx: &mut PaKVCtx) {
     let path = Path::new(pathstr_of_logfile());
     //1.缓存文件文件夹
     if let Err(e)= fs::create_dir(path){
-        eprintln!("{}",e);
+        // eprintln!("{}",e);
+        info!("make sure store folder exist {}",e);
     }
     ctx.meta_file_ope.makesure_exist();
     let tarfid =ctx.meta_file_ope.get_usertar_fid();
@@ -251,12 +252,12 @@ pub fn file_check(ctx: &mut PaKVCtx) {
     for dir_ in r {
         match dir_ {
             Ok(dir) => {
-                println!("scanning log {}", dir.path().as_os_str().to_str().unwrap());
+                // println!("scanning log {}", dir.path().as_os_str().to_str().unwrap());
                 let p = dir.path();
                 let file = File::open(&p).unwrap();
                 let mut fileid = LogFileId { id: 0 };
                 if !fileid.set_by_logfile_path(&p){
-                    println!("  skip");
+                    // println!("  skip");
                     continue;
                 }
                 match file.metadata() {
@@ -273,11 +274,12 @@ pub fn file_check(ctx: &mut PaKVCtx) {
                 }
             }
             Err(e) => {
-                println!("{}", e);
+                error!("err when go through store folder {}", e);
             }
         }
     }
     fn file_readlogs(ctx:&mut PaKVCtx,fid:LogFileId,file:&mut File){
+        info!("recovering from log file {}",fid.id);
         logfile_gothroughlogs(file, |off, _line, kvope| {
             // println!("recover ope {} {}",line_str,off);
             // println!("seek relative {}");
@@ -297,6 +299,7 @@ pub fn file_check(ctx: &mut PaKVCtx) {
     }
     let mut tarfile =None;
     let mut latest_fid=0;
+    info!("begin to recover hash index from logs，and make sure tarfile {} exist",tarfid);
     //最新编辑的最后操作
     for (_t,(id, mut file)) in rank_by_edit_time{
         // println!("cur file id {} tarfid {}",id.id,tarfid);
@@ -311,20 +314,24 @@ pub fn file_check(ctx: &mut PaKVCtx) {
         None => {
             //没有找到目标存储文件，则选定一个序号作为目标文件
             if latest_fid!=0{
+                info!("didnt find tarfile,the latest edit file {} would be chosen for tarfile",latest_fid);
                 ctx.tarfid.id=latest_fid;
                 ctx.meta_file_ope.set_usertar_fid(latest_fid);
                 // META_FILE_OPE.with(|mut file|{
                 //     file.borrow_mut().set_usertar_fid(latest_fid);
                 // })
             }else{
+                info!("no log file exists,tarfile would be 1");
                 ctx.tarfid.id=1;
                 ctx.tarfid.touch_if_not_exist();
             }
         }
         Some(mut f) => {
+            info!("the tarfile id {} in meta is valid, would be set as current tarfile",tarfid);
             //找到了匹配的
             ctx.tarfid.id=tarfid;
             file_readlogs(ctx,ctx.tarfid.clone(),&mut f);
         }
     }
+    info!("index recovering finished!");
 }

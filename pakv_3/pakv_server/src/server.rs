@@ -24,7 +24,7 @@ impl PaKVServer{
 
     pub fn start(&mut self){
 
-        println!("start server at {}", ADDRESS);
+        info!("start server at {}", ADDRESS);
         let listener = TcpListener::bind(ADDRESS).unwrap();
 
         for stream in listener.incoming() {
@@ -35,7 +35,7 @@ impl PaKVServer{
     }
 
     fn handle_connection(&self, mut stream: TcpStream){
-        println!("handle connection");
+        info!("handle connection");
         let mut buffer = [0; 2048];
 
         let len=stream.read(&mut buffer).unwrap();
@@ -76,7 +76,7 @@ impl PaKVServer{
 
     fn cmdmatch(&self, s:Cow<str>) -> String {
         let div:Vec<&str>=s.as_ref().split_whitespace().collect::<Vec<&str>>();
-        println!("recv:{}",s);
+        // println!("recv:{}",s);
         if div.len()==2 && div[0]=="get"{
             return self.cmdhandle_get(div[1]);
 

@@ -25,7 +25,7 @@ impl MetaFileOpe{
 
     pub fn makesure_exist(&self){
         if let Err(e)= OpenOptions::new().create(true).write(true).open(Path::new(MetaFileOpe::metafile_path())){
-            eprintln!("{}",e);
+            info!("确保meta文件存在 {}",e);
         }
     }
 
