@@ -6,3 +6,7 @@ pakv_2/store/
 pakv_3/pakv_client/target/
 pakv_3/pakv_server/target/
 pakv_3/pakv_server/store/
+pakv_4/pakv_server/target/
+pakv_4/pakv_client/target/
+pakv_4/pakv_client/benchlib/target/
+pakv_4/pakv_server/store/

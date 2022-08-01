@@ -22,29 +22,44 @@ impl PaKVServer{
         }
     }
 
-    pub fn start(&mut self){
+    pub fn start(&mut self,tphandle:paco::threadpool::ThreadPoolHandle){
 
         info!("start server at {}", ADDRESS);
         let listener = TcpListener::bind(ADDRESS).unwrap();
 
         for stream in listener.incoming() {
             let stream = stream.unwrap();
-
-            self.handle_connection(stream);
+            let chandle=ClientHandle::new(self.pakvchan.clone());
+            tphandle.execute(move ||{
+                chandle.handle_connection(stream);
+            })
+                // self.handle_connection(&handle,stream);
         }
     }
+}
+pub struct  ClientHandle{
+    pakvchan:PaKVCtxChanCallerForUser
+}
+impl ClientHandle{
+    pub fn new(pakvchan:PaKVCtxChanCallerForUser)->ClientHandle{
+        ClientHandle{
+            pakvchan
+        }
+    }
+    pub fn handle_connection(&self,mut stream: TcpStream){
 
-    fn handle_connection(&self, mut stream: TcpStream){
-        info!("handle connection");
-        let mut buffer = [0; 2048];
+            info!("handle connection");
+            let mut buffer = [0; 2048];
 
-        let len=stream.read(&mut buffer).unwrap();
-        let s=String::from_utf8_lossy(&buffer[..len]);
-        let rep=self.cmdmatch(s);
-        // let response = "HTTP/1.1 200 OK\r\n\r\n";
+            let len=stream.read(&mut buffer).unwrap();
+            let s=String::from_utf8_lossy(&buffer[..len]);
+            let rep=self.cmdmatch(s);
+            // let response = "HTTP/1.1 200 OK\r\n\r\n";
 
-        stream.write(rep.as_bytes()).unwrap();
-        stream.flush().unwrap();
+            stream.write(rep.as_bytes()).unwrap();
+            stream.flush().unwrap();
+
+
     }
 
     fn cmdhandle_get(&self, k:&str)->String{

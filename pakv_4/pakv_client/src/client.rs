@@ -16,10 +16,10 @@ impl PakVClient{
         client.read_to_string(&mut content).expect("读取失败");
         // println!("  recv {}",content);
         if let Some(_v)= content.find("s:"){
-            println!("  succ: {}",&content[2..]);
+            // println!("  succ: {}",&content[2..]);
         }
         else if let Some(_v)= content.find("f:"){
-            println!("  fail: {}",&content[2..]);
+            // println!("  fail: {}",&content[2..]);
         }
         else{
             println!("  invalid request!");
