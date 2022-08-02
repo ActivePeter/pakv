@@ -1,26 +1,17 @@
 # pakv_talentplan
-talentplan rust practice course
+talentplan rust practice course. [talent-plan/lesson-plan.md at master · pingcap/talent-plan (github.com)](https://github.com/pingcap/talent-plan/blob/master/courses/rust/docs/lesson-plan.md)
 
 [Practical Networked Applications in Rust](https://github.com/pingcap/talent-plan/blob/master/courses/rust/README.md)
 
 [lesson-plan](https://github.com/pingcap/talent-plan/blob/master/courses/rust/docs/lesson-plan.md)
 
-### [Project 1: The Rust toolbox][p1]
+[pakv Project 1: The Rust toolbox](./pakv_1/readme.md)
 
-**Task**: Create an in-memory key/value store that passes simple tests and responds
-to command-line arguments.
+[pakv Project 2: Log-structured file I/O](./pakv_2/readme.md)
 
-**Goals**:
+[pakv Project 3: Synchronous client-server networking](./pakv_3/readme.md)
 
-- x Install the Rust compiler and tools
-- x Learn the project structure used throughout this course
-- Use `cargo init` / `run` / `test` / `clippy` / `fmt`
-- Learn how to find and import crates from crates.io
-- Define an appropriate data type for a key-value store
+[pakv Project 4: Concurrency and parallelism](./pakv_4/readme.md)
 
-**Topics**: testing, the `clap` crate, `CARGO_VERSION` etc., the `clippy` and
-  `rustfmt` tools.
+[pakv Project 5: Asynchrony](./pakv_5/readme.md)
 
-**Extensions**: the `structopt` crate.
-
-[p1]: 
