@@ -47,47 +47,5 @@ impl PaKVServer{
         stream.flush().unwrap();
     }
 
-    fn cmdhandle_get(&self, k:&str)->String{
-        match
-        self.pakvchan.get(k.to_string()){
-            None => {
-                reply_fail_str("didn't find".to_string())
-            }
-            Some(s) => {
-                format!("s:find {}", s)
-            }
-        }
-
-    }
-    fn cmdhandle_set(&self,k:&str,v:&str)->String{
-        self.pakvchan.set(k.to_string(),v.to_string());
-        reply_succ_str("setted".to_string())
-    }
-    fn cmdhandle_del(&self,k:&str)->String{
-        match self.pakvchan.del(k.to_string()){
-            true => {
-                reply_succ_str("found and delete".to_string())
-            }
-            false => {
-                reply_fail_str("didnt find".to_string())
-            }
-        }
-    }
-
-    fn cmdmatch(&self, s:Cow<str>) -> String {
-        let div:Vec<&str>=s.as_ref().split_whitespace().collect::<Vec<&str>>();
-        // println!("recv:{}",s);
-        if div.len()==2 && div[0]=="get"{
-            return self.cmdhandle_get(div[1]);
-
-        }
-        if div.len()==3 && div[0]=="set" {
-            return self.cmdhandle_set(div[1],div[2]);
-
-        }
-        if div.len()==2 && div[0]=="del" {
-            return self.cmdhandle_del(div[1]);
-        }
-        return "Invalid Cmd".to_string();
-    }
+    
 }

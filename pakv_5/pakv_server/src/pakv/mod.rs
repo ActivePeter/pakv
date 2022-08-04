@@ -1,17 +1,20 @@
 
 pub mod file;
 pub mod channel_caller;
+mod kernel2app_msg;
+// mod client_match_msg;
 
 use std::collections::{HashMap, HashSet};
 use std::{ thread};
-use std::sync;
+use tokio::sync;
 use file::{ LogFileId, FilePos};
-use std::sync::mpsc::{ Sender, Receiver};
+// use std::sync::mpsc::{ Sender, Receiver};
 
 use file::meta::MetaFileOpe;
 use file::serial::{KvOpe, KvOpeE};
 use file::compact::CompactCtx;
-use crate::pakv::channel_caller::{ PaKVCtxChanCallerForUser, PaKVCtxChanCallerForSys};
+use crate::pakv::channel_caller::{App2KernelSender, PaKVCtxChanCallerForSys};
+use tokio::sync::mpsc::{Sender, Receiver};
 // use crate::r#mod;
 
 
@@ -48,71 +51,107 @@ impl KVStore{
     }
 }
 
-pub enum UserKvOpe{
+pub enum KvOpeCmd {
+    KvClientIn{
+      cid:u64,
+        client_handle:PaKVClientHandle
+    },
+    KvClientOut{
+        cid:u64
+    },
     KvOpeSet{k:String,v:String,
-        resp:sync::mpsc::Sender<bool>
+        // resp:sync::mpsc::Sender<bool>
     },
     KvOpeDel{k:String,
-        resp:sync::mpsc::Sender<bool>
+        // resp:sync::mpsc::Sender<bool>
     },
     KvOpeGet{k:String,
-        resp:sync::mpsc::Sender<Option<String>>},
+        // resp:sync::mpsc::Sender<Option<String>>
+    },
+
     SysKvOpeBatchUpdate{
         fid:LogFileId,map_k2pos:HashMap<String,u64>,
-        resp:Sender<bool>
+        resp:sync::mpsc::Sender<bool>
     },
     SysKvOpeCompactEnd{
 
     }
 }
-impl UserKvOpe{
-    pub fn create_set_chan() -> (Sender<bool>, Receiver<bool>) {
-        UserKvOpe::create_del_chan()
-    }
-    pub fn create_get_chan() -> (Sender<Option<String>>, Receiver<Option<String>>) {
-        let c:(
-        sync::mpsc::Sender<Option<String>>,
-        sync::mpsc::Receiver<Option<String>>
-        )=sync::mpsc::channel();
-
-        c
-    }
-    pub fn create_del_chan() -> (Sender<bool>,
-                                 Receiver<bool>) {
-        let c:(
-            sync::mpsc::Sender<bool>,
-            sync::mpsc::Receiver<bool>
-        )=sync::mpsc::channel();
-
-        c
+pub enum KernelToAppMsg{
+    SetResult{
+        opeid:PaKVOpeId,
+        succ:bool
+    },
+    DelResult{
+        opeid:PaKVOpeId,
+        succ:bool
+    },
+    GetResult{
+        opeid:PaKVOpeId,
+        v:Option<String>
     }
 }
+// impl UserKvOpe{
+//     pub fn create_set_chan() -> (Sender<bool>, Receiver<bool>) {
+//         UserKvOpe::create_del_chan()
+//     }
+//     pub fn create_get_chan() -> (Sender<Option<String>>, Receiver<Option<String>>) {
+//         let c:(
+//         sync::mpsc::Sender<Option<String>>,
+//         sync::mpsc::Receiver<Option<String>>
+//         )=sync::mpsc::channel();
+//
+//         c
+//     }
+//     pub fn create_del_chan() -> (Sender<bool>,
+//                                  Receiver<bool>) {
+//         let c:(
+//             sync::mpsc::Sender<bool>,
+//             sync::mpsc::Receiver<bool>
+//         )=sync::mpsc::channel();
+//
+//         c
+//     }
+// }
 
+pub type PaKVOpeId=u64;
 
 pub struct PaKVCtx{
     pub store:KVStore,
     pub tarfid:LogFileId,//使用前已经确保文件可写
-    pub sys_chan_caller:PaKVCtxChanCallerForSys,
-    pub user_chan_caller:PaKVCtxChanCallerForUser,
+    // pub sys_chan_caller:PaKVCtxChanCallerForSys,
+    // pub user_chan_caller:PaKVCtxChanCallerForUser,
     pub compacting:bool,//标记compact，compact期间，需要将操作存入特殊位置
     pub user_opek_whencompact:HashSet<String>,
-    pub meta_file_ope:MetaFileOpe
+    pub meta_file_ope:MetaFileOpe,
+    kernel2app_sender:Sender<KernelToAppMsg>,
+    // kernel2app_receiver:Receiver<KernelToAppMsg>,
+    opeid:PaKVOpeId
 }
 impl PaKVCtx{
-    pub fn create(sendin_chan:sync::mpsc::Sender<UserKvOpe>) -> PaKVCtx {
-        return PaKVCtx{
+    pub fn create() -> (PaKVCtx,Receiver<KernelToAppMsg>) {
+        let (t,r):
+            (Sender<KernelToAppMsg>,Receiver<KernelToAppMsg>)
+            =tokio::sync::mpsc::channel(10);
+        return (PaKVCtx{
             store: KVStore::create(),
             tarfid: LogFileId{ id: 1 },
-            sys_chan_caller:PaKVCtxChanCallerForSys::new(sendin_chan.clone()),
-            user_chan_caller:PaKVCtxChanCallerForUser::new(sendin_chan),
+            // sys_chan_caller:PaKVCtxChanCallerForSys::new(sendin_chan.clone()),
+            // user_chan_caller:PaKVCtxChanCallerForUser::new(sendin_chan),
             compacting: false,
             user_opek_whencompact: Default::default(),
-            meta_file_ope:MetaFileOpe::create()
-        }
+            meta_file_ope:MetaFileOpe::create(),
+            opeid:0,
+            kernel2app_sender:t,
+        },r)
     }
-
-    pub fn set(&mut self, k:String, v:String) -> u64 {
-
+    fn get_opeid(&mut self)->PaKVOpeId{
+        let ret=self.opeid;
+        self.opeid+=1;
+        ret
+    }
+    pub fn set(&mut self, k:String, v:String) -> PaKVOpeId {
+        let opeid=self.get_opeid();
         let ope=KvOpe{
             ope: KvOpeE::KvOpeSet {k:k.clone(),v:v.clone()}
         };
@@ -130,9 +169,11 @@ impl PaKVCtx{
             CompactCtx::compact_ifneed(self, pos);
         }
         // self.append_log(ope.to_line_str().unwrap());
-        pos
+        opeid
     }
-    pub fn del(&mut self, k:&String) -> Option<FilePos> {
+    pub fn del(&mut self, k:&String) ->PaKVOpeId {
+        let opeid=self.get_opeid();
+
         //1.log
         let ope=KvOpe{
             ope: KvOpeE::KvOpeDel {k:k.clone()}
@@ -147,9 +188,10 @@ impl PaKVCtx{
             CompactCtx::compact_ifneed(self, pos);
         }
 
-        ret
+        opeid
     }
-    pub fn get(&self, k:&String) -> Option<String> {
+    pub fn get(&mut self, k:&String) -> PaKVOpeId {
+        let opeid=self.get_opeid();
         let res=self.store.get(k);
         match res{
             None => {
@@ -176,24 +218,26 @@ impl PaKVCtx{
                 None
             }
         }
+
+        opeid
     }
 }
-pub fn start_kernel() -> PaKVCtxChanCallerForUser {
+pub async fn start_kernel() -> App2KernelSender {
     let (tx,rx)
-        :(sync::mpsc::Sender<UserKvOpe>,
-          sync::mpsc::Receiver<UserKvOpe>)
-        =sync::mpsc::channel();
+        :(sync::mpsc::Sender<KvOpe>,
+          sync::mpsc::Receiver<KvOpe>)//kv内核循环，用于接收用户和来自内核的数据库操作
+        =sync::mpsc::channel(10);
     let mut ctx=PaKVCtx::create(tx.clone());
     file::file_check(&mut ctx);
-    fn handle_ope(ctx:&mut PaKVCtx, ope:UserKvOpe){
+    fn handle_ope(ctx:&mut PaKVCtx, ope: KvOpe){
         match ope{
-            UserKvOpe::KvOpeSet {
-                k,v, resp
+            KvOpeCmd::KvOpeSet {
+                k,v
             } => {
                 ctx.set(k,v);
-                resp.send(true).unwrap();
+
             }
-            UserKvOpe::KvOpeDel { k,resp } => {
+            KvOpeCmd::KvOpeDel { k } => {
                 match ctx.del(&k){
                     None => {
                         resp.send(false).unwrap();
@@ -203,8 +247,8 @@ pub fn start_kernel() -> PaKVCtxChanCallerForUser {
                     }
                 }
             }
-            UserKvOpe::KvOpeGet {
-                k,resp } => {
+            KvOpeCmd::KvOpeGet {
+                k } => {
                 match ctx.get(&k){
                     None => {
                         resp.send(None).unwrap();
@@ -214,7 +258,7 @@ pub fn start_kernel() -> PaKVCtxChanCallerForUser {
                     }
                 }
             }
-            UserKvOpe::SysKvOpeBatchUpdate {fid,map_k2pos,resp  } => {
+            KvOpe::SysKvOpeBatchUpdate {fid,map_k2pos,resp  } => {
                 ctx.compacting=true;
                 for (k,pos) in map_k2pos{
                     if !ctx.user_opek_whencompact.contains(&k) {
@@ -226,14 +270,14 @@ pub fn start_kernel() -> PaKVCtxChanCallerForUser {
                 }
                 resp.send(true).unwrap();
             }
-            UserKvOpe::SysKvOpeCompactEnd { .. } => {
+            KvOpe::SysKvOpeCompactEnd { .. } => {
                 ctx.compacting=false;
                 ctx.user_opek_whencompact.clear();
             }
         }
     }
     let ret=ctx.user_chan_caller.clone();
-    let _handle = thread::spawn(move || {
+    tokio::spawn(move || {
         loop {
             let r=rx.recv();
             match r{
