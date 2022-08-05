@@ -9,9 +9,9 @@ use crate::client2server::Client2ServerSender;
 
 const ADDRESS: &str = "127.0.0.1:7878";
 
-pub struct PaKVServer{
-    pakvchan: App2KernelSender
-}
+// pub struct PaKVServer{
+//     pakvchan: App2KernelSender
+// }
 
 pub async fn start(){
     let mut nextcid=0 as ClientId;

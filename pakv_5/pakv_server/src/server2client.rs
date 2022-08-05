@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Sender;
 use pakv_server_lib::pakv::KernelToAppMsg;
-use crate::msg2client;
+use crate::msg_gen;
 
 pub struct Server2ClientMsg {
     pub serilized_vec:Vec<u8>
@@ -24,14 +24,14 @@ impl Server2ClientSender {
         }
     }
     pub async fn set_rpl(&self, succ:bool){
-        self._sender.send(Server2ClientMsg::new(msg2client::genmsg_setrpl(succ))).await.unwrap()
+        self._sender.send(Server2ClientMsg::new(msg_gen::genmsg_setrpl(succ))).await.unwrap()
     }
     pub async fn get_rpl(&self, res:Option<String>){
         self._sender.send(Server2ClientMsg::new(
-            msg2client::genmsg_getrpl(res))).await.unwrap()
+            msg_gen::genmsg_getrpl(res))).await.unwrap()
     }
     pub async fn del_rpl(&self, succ:bool) {
         self._sender.send(Server2ClientMsg::new(
-            msg2client::genmsg_delrpl(succ))).await.unwrap()
+            msg_gen::genmsg_delrpl(succ))).await.unwrap()
     }
 }

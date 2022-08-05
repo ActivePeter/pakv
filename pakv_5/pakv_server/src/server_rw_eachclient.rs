@@ -54,7 +54,7 @@ pub type ClientId =u64;
                     match packmaker.handle_a_buffset(&buf,n).await{
                         None => {break;}
                         Some(slice) => {
-                            msg2server::match_msg_from_client(cid,&c2s,slice).await;
+                            msg_match::match_msg_from_client(cid, &c2s, slice).await;
                         }
                     }
                 }
