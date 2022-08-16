@@ -34,11 +34,12 @@
         pub fn before_handle(&mut self){
             self.handled_offset=0;
         }
+
+
         pub async fn handle_a_buffset
         (&mut self, buffset: &[u8], _byte_cnt: usize)->Option<&[u8]>
             // where F: FnMut(&[u8])
         {
-            // let mut handled_offset = 0;
 
             while self.handled_offset < _byte_cnt {
                 let byte_cnt_left = _byte_cnt - self.handled_offset;
@@ -104,6 +105,7 @@
         }
         fn write_data_2_body(&mut self, buffset: &[u8], byte_cnt_left: usize) {
             for i in 0..byte_cnt_left {
+                // println!("buff i {}",buffset[i] as char);
                 self.body_buff[self.body_rec_cnt as usize + i] =
                     buffset[i];
             }
@@ -111,6 +113,7 @@
         fn calc_pack_head(&mut self) {
             // self.pack_head.pack_id = self.head_buff[0];
             self.pack_head.pack_len = BigEndian::read_u32(&self.head_buff);
+            println!("packlen {}",self.pack_head.pack_len);
         }
     }
 // }

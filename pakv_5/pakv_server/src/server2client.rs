@@ -1,7 +1,8 @@
 use tokio::sync::mpsc::Sender;
 use pakv_server_lib::pakv::KernelToAppMsg;
-use crate::msg_gen;
+use crate::net::msg_gen;
 
+#[derive(Debug)]
 pub struct Server2ClientMsg {
     pub serilized_vec:Vec<u8>
 }
@@ -14,6 +15,7 @@ impl Server2ClientMsg{
 }
 
 /// 持有管道，向client的发送进程发送数据
+#[derive(Clone,Debug)]
 pub struct Server2ClientSender {
     _sender:Sender<Server2ClientMsg>
 }
@@ -24,7 +26,9 @@ impl Server2ClientSender {
         }
     }
     pub async fn set_rpl(&self, succ:bool){
-        self._sender.send(Server2ClientMsg::new(msg_gen::genmsg_setrpl(succ))).await.unwrap()
+        self._sender.send(
+            Server2ClientMsg::new(
+                msg_gen::genmsg_setrpl(succ))).await.unwrap()
     }
     pub async fn get_rpl(&self, res:Option<String>){
         self._sender.send(Server2ClientMsg::new(

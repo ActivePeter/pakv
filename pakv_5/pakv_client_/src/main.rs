@@ -2,6 +2,7 @@ pub mod input;
 pub mod conn;
 pub mod chan;
 pub mod msg_parse;
+pub mod msg_gen;
 
 #[tokio::main]
 async fn main() {
@@ -10,4 +11,5 @@ async fn main() {
     }else{
         println!("failed to conn");
     }
+    println!("main end");
 }

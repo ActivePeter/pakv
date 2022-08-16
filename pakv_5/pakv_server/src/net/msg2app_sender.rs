@@ -1,9 +1,10 @@
-use crate::server_rw_eachclient::{ClientId};
+
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::server2client::Server2ClientSender;
+use crate::net::server_rw_eachclient::ClientId;
 
-#[derive(Clone)]
-pub enum Client2ServerMsg{
+#[derive(Clone,Debug)]
+pub enum NetMsg2App {
     ClientIn{cid:ClientId,s2csender:Server2ClientSender},
     ClientOut{cid:ClientId},
     Set{cid:ClientId,k:String,v:String},
@@ -11,45 +12,45 @@ pub enum Client2ServerMsg{
     Del{cid:ClientId,k:String}
 }
 #[derive(Clone)]
-pub struct Client2ServerSender {
-    sender:Sender<Client2ServerMsg>
+pub struct NetMsg2AppSender {
+    sender:Sender<NetMsg2App>
 }
 
-impl Client2ServerSender {
-    pub fn create_with_chan() -> (Client2ServerSender, Receiver<Client2ServerMsg>) {
+impl NetMsg2AppSender {
+    pub fn create_with_chan() -> (NetMsg2AppSender, Receiver<NetMsg2App>) {
         let (tx,rx)
-            :(Sender<Client2ServerMsg>,Receiver<Client2ServerMsg>)
+            :(Sender<NetMsg2App>, Receiver<NetMsg2App>)
             =tokio::sync::mpsc::channel(10);
-        (Client2ServerSender {
+        (NetMsg2AppSender {
             sender:tx
         }, rx)
     }
     pub async fn client_in(&self,cid:ClientId,s2csender:Server2ClientSender){
-        self.sender.send(Client2ServerMsg::ClientIn {
+        self.sender.send(NetMsg2App::ClientIn {
             cid,
             s2csender
         }).await.unwrap();
     }
     pub async fn client_out(&self,cid:ClientId){
-        self.sender.send(Client2ServerMsg::ClientOut {
+        self.sender.send(NetMsg2App::ClientOut {
             cid: cid
         }).await.unwrap()
     }
     pub async fn set(&self,cid:ClientId,k:String,v:String){
-        self.sender.send(Client2ServerMsg::Set {
+        self.sender.send(NetMsg2App::Set {
             cid,
             k,
             v
         }).await.unwrap()
     }
     pub async fn get(&self,cid:ClientId,k:String){
-        self.sender.send(Client2ServerMsg::Get {
+        self.sender.send(NetMsg2App::Get {
             cid,
             k
         }).await.unwrap()
     }
     pub async fn del(&self,cid:ClientId,k:String){
-        self.sender.send(Client2ServerMsg::Del {
+        self.sender.send(NetMsg2App::Del {
             cid,
             k
         }).await.unwrap()

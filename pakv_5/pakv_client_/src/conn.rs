@@ -3,7 +3,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::mpsc::Receiver;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 use crate::msg_parse::MsgParser;
-
+use crate::msg_gen;
 
 const ADDRESS: &str = "127.0.0.1:7878";
 // pub struct Connection{
@@ -19,7 +19,9 @@ const ADDRESS: &str = "127.0.0.1:7878";
             loop {
                 let n = match rh.read(&mut buf).await {
                     // socket closed
-                    Ok(n) if n == 0 => break,
+                    Ok(n) if n == 0 => {
+                        println!("socket  end ");
+                        break; },
                     Ok(n) => n,
                     Err(e) => {
                         eprintln!("failed to read from socket; err = {:?}", e);
@@ -37,7 +39,7 @@ const ADDRESS: &str = "127.0.0.1:7878";
                     }
                 }
             }
-            send2app
+            println!("readloop end")
         });
     }
     async fn writeloop(mut wh:OwnedWriteHalf, mut r:Receiver<App2ConnMsg>){
@@ -49,10 +51,23 @@ const ADDRESS: &str = "127.0.0.1:7878";
                         break;
                     }
                     Some(msg) => {
+                        println!("writeloop send");
+                        //发送头
+                        let head=msg_gen::headlen_bytes(&msg.vec);
+                        let r=wh.write_all(&head).await;
+                        match r{
+                            Ok(_) => {}
+                            Err(e) => {
+                                println!("send err {}",e);
+                                break;
+                            }
+                        }
+                        //发送体
                         let r=wh.write_all(msg.vec.as_bytes()).await;
                         match r{
                             Ok(_) => {}
-                            Err(_) => {
+                            Err(e) => {
+                                println!("send err {}",e);
                                 break;
                             }
                         }
@@ -63,15 +78,19 @@ const ADDRESS: &str = "127.0.0.1:7878";
     }
     pub async fn conn2server()->Option<(App2ConnSend,Receiver<Conn2AppMsg>)>{
         let res=tokio::net::TcpStream::connect(ADDRESS).await;
-
-        if let Ok(st)=res{
+        if let Ok( st)=res{
+            println!("connected");
             let (s,r)=App2ConnSend::new();
-            let (c2a_s,c2a_r)=Conn2AppSend::new();
-            let (rh,wh)=st.into_split();
+            let (c2a_s, c2a_r)=Conn2AppSend::new();
+
+            let ( rh,wh)=st.into_split();
             readloop(rh,c2a_s).await;
+
             writeloop(wh,r).await;
+
             Some((s,c2a_r))
         }else{
+            res.unwrap();
             None
         }
     }

@@ -13,12 +13,14 @@ pub struct Conn2AppSend{
 }
 impl Conn2AppSend{
     pub fn new() -> (Conn2AppSend, Receiver<Conn2AppMsg>) {
-        let (t,r)
+        let (t, r)
             :(TMpsc::Sender<Conn2AppMsg>,TMpsc::Receiver<Conn2AppMsg>)
             =tokio::sync::mpsc::channel(10);
+
         (Conn2AppSend{
             send: t
         },r)
+
     }
     pub async fn send_print2usr(&self,str:String){
         self.send.send(Conn2AppMsg::Common {

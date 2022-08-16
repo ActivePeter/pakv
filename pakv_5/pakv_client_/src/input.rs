@@ -1,30 +1,35 @@
 // use std::io;
 // use std::io::{Write, BufReader};
 use crate::chan::{App2ConnSend, Conn2AppMsg};
-use tokio::io::{AsyncWriteExt, AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::mpsc::Receiver;
+use std::io::Write;
 
-pub async fn input_wait(send:App2ConnSend,mut rec:Receiver<Conn2AppMsg>){
-
+pub async fn input_wait(send: App2ConnSend, mut rec: Receiver<Conn2AppMsg>) {
+    println!("input_wait");
     // loop {
-    async fn newinput(){
+    fn newinput() {
         print!("> ");
-        tokio::io::stdout().flush().await.expect("Couldn't flush stdout");
+        std::io::stdout().flush().expect("Couldn't flush stdout");
     }
-        // Print command prompt and get command
-    newinput().await;
-        // let mut input = String::new();
+    // Print command prompt and get command
+    newinput();
+    // println!("input_wait");
+    // let mut input = String::new();
 
-        let mut lines = BufReader::new(tokio::io::stdin()).lines();
-        loop{
-            tokio::select! {
+    let mut lines = BufReader::new(tokio::io::stdin()).lines();
+    loop {
+        tokio::select! {
                 line_= lines.next_line()=>{
                     // match line_{/
-                        if let Ok(Some(line))=line_{
-                            send.send_cmd(line).await;
-                        }else{
-                            break;
-                        }
+                    if let Ok(Some(line))=line_{
+
+                        println!("line input {}",line);
+                        send.send_cmd(line).await;
+                    }else{
+                        println!("input end");
+                        break;
+                    }
                     // }
                 }
                 msg_=rec.recv()=>{
@@ -38,20 +43,19 @@ pub async fn input_wait(send:App2ConnSend,mut rec:Receiver<Conn2AppMsg>){
                                     print2user
                                 }=>{
                                     println!("  {}",print2user);
-                                    newinput().await;
+                                    newinput();
                                 }
                             }
                         }
                         None=>{
+                            println!("net no");
                             break;
                         }
                     }
                 }
             }
-            // if let Some(line) = lines.next_line().await {
-            //     println!("length = {}", line.len())
-            // }
-        }
+    }
 
+    println!("loop end");
     // }
 }

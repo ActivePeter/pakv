@@ -2,8 +2,8 @@
 //处理tcp收发粘包半包
 // pub mod msg_pack_make {
     use byteorder::{LittleEndian, BigEndian, ByteOrder};
-    use crate::net_pack_convert::{MsgEnum, bytes_to_pack};
-    use crate::net::{ReceiveHandlerKernel};
+    // use crate::net_pack_convert::{MsgEnum, bytes_to_pack};
+    // use crate::net::{ReceiveHandlerKernel};
     use tokio::macros::support::Future;
 
     const MsgPackHeadSize: u8 = 4;
@@ -82,7 +82,7 @@
                     self.handled_offset += len as usize;
 
                     self.reset();
-                    return Some(self.body_buff.as_slice()[..self.pack_head.pack_len as usize]);
+                    return Some(&self.body_buff.as_slice()[..self.pack_head.pack_len as usize]);
                     //对包进行解析
                     // onepack_cb(self.body_buff.as_slice()[..self.pack_head.pack_len as usize]);
                     // let a = bytes_to_pack(self.pack_head.pack_id as i32,

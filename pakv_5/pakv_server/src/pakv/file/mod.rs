@@ -1,6 +1,9 @@
 pub mod serial;
 pub mod compact;
 pub mod meta;
+pub mod wrworker;
+pub mod fileio;
+
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, read_dir, File};
 use std::io::{BufReader, BufRead, Write, Seek, SeekFrom};
@@ -28,7 +31,7 @@ use serial::{KvOpeE, KvOpe};
 // }
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct FilePos {
     pub file_id: u64,
     pub pos: u64,
@@ -63,7 +66,7 @@ impl FilePos {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct LogFileId {
     pub(crate) id: u64,
 }
@@ -138,6 +141,7 @@ impl LogFileId {
     // }
 }
 
+//old
 pub fn logfile_gothroughlogs(file: &File, mut handle_one_ope: impl FnMut(u64, &String, &KvOpe)) {
     let mut reader = BufReader::new(file);
     let mut off: u64 = 0;
@@ -169,6 +173,7 @@ pub fn logfile_gothroughlogs(file: &File, mut handle_one_ope: impl FnMut(u64, &S
     }
 }
 
+//old no async
 pub fn file_append_log(filepath: &PathBuf, mut str: String) -> Option<u64> {
     // match ctx.tarfpath.clone(){
     //     None => {

@@ -1,12 +1,17 @@
-use crate::client2server::Client2ServerSender;
-use crate::server_rw_eachclient::ClientId;
+// use crate::client2server::Client2ServerSender;
+// use crate::server_rw_eachclient::ClientId;
+
+use crate::net::server_rw_eachclient::ClientId;
+use crate::net::msg2app_sender::NetMsg2AppSender;
 
 pub async fn match_msg_from_client(
     fromcid:ClientId,
-    c2ssender: &Client2ServerSender,
+    c2ssender: &NetMsg2AppSender,
     slice: &[u8],
 ) {
-    let div: Vec<&str> = slice.as_ref().split_whitespace().collect::<Vec<&str>>();
+    let to_str=std::str::from_utf8(slice).unwrap();
+    println!("recv client msg: {}",to_str);
+    let div: Vec<&str> = to_str.split_whitespace().collect::<Vec<&str>>();
     // println!("recv:{}",s);
     if div.len() == 2 && div[0] == "get" {
         c2ssender.get(fromcid,div[1].to_string()).await;

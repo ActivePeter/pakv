@@ -17,8 +17,8 @@ impl KvOpe {
     pub fn from_str(str_: &str) -> serde_json::Result<KvOpe> {
         serde_json::from_str(str_)
     }
-    pub fn to_line_str(&self) -> serde_json::Result<String> {
-        serde_json::to_string(self)
+    pub fn to_line_str(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }
 
