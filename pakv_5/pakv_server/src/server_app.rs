@@ -1,4 +1,4 @@
-use pakv_server_lib::pakv::{PaKVCtx, KernelToAppMsg, PaKVOpeId, KernelWorker2Main};
+
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::Receiver;
@@ -6,13 +6,18 @@ use tokio::sync::mpsc::Receiver;
 use crate::server2client::Server2ClientSender;
 use crate::net::msg2app_sender::NetMsg2App;
 use crate::net::server_rw_eachclient::ClientId;
+use crate::pakv::{PaKVCtx, PaKVOpeId, KernelWorker2Main, PaKvOpeResult};
 
+pub enum Requester{
+    NetClient(ClientId),
+    ChannelSendBack(tokio::sync::oneshot::Sender<PaKvOpeResult>)
+}
 //持有pakv内核以及服务端状态，
 pub struct PaKVServerApp {
     pub(crate) kernel:PaKVCtx,//内核运行上下文
     pub(crate) clients_cid2sender:HashMap<ClientId,Server2ClientSender>,//用于服务端向客户端发消息
-    pub(crate) kernelopeid_2_cid:HashMap<PaKVOpeId,ClientId>,//用于处理内核的执行结果
-
+    // pub(crate) kernelopeid_2_cid:HashMap<PaKVOpeId,ClientId>,//用于处理内核的执行结果
+pub(crate) kernelopeid_2_requester:HashMap<PaKVOpeId,Requester>,
     kernel2apprecv:Receiver<KernelWorker2Main>
 }
 impl PaKVServerApp {
@@ -21,18 +26,14 @@ impl PaKVServerApp {
         PaKVServerApp {
             kernel,
             clients_cid2sender: Default::default(),
-            kernelopeid_2_cid: Default::default(),
+            // kernelopeid_2_cid: Default::default(),
+            kernelopeid_2_requester: Default::default(),
             kernel2apprecv:r
         }
     }
-    pub fn get_server2clientsender_of_opeid(&self,opeid:PaKVOpeId)->Option<&Server2ClientSender>{
-        if let Some(cid)=self.kernelopeid_2_cid.get(&opeid){
-            if let Some(csender)=self.clients_cid2sender.get(cid){
-                return Some(csender);
-            }
-            return None;
-        }
-        return None;
+    pub fn consume_requester_of_opeid(&mut self,opeid:PaKVOpeId)->Requester{
+        let requster=self.kernelopeid_2_requester.remove(&opeid);
+        requster.unwrap()
     }
     pub fn client_in(&mut self,cid:ClientId,s2csender:Server2ClientSender){
         self.clients_cid2sender.insert(cid,s2csender);
@@ -57,7 +58,6 @@ impl PaKVServerApp {
                 }
                 msg =  net_recv.recv()=> {
 
-                    println!("app recv net msg");
                     self.consume_net(msg.unwrap()).await;
                 }
             }

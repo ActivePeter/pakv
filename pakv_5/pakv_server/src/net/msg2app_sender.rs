@@ -2,14 +2,34 @@
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::server2client::Server2ClientSender;
 use crate::net::server_rw_eachclient::ClientId;
+use crate::pakv::PaKvOpeResult;
 
-#[derive(Clone,Debug)]
+#[derive(Debug)]
 pub enum NetMsg2App {
     ClientIn{cid:ClientId,s2csender:Server2ClientSender},
     ClientOut{cid:ClientId},
     Set{cid:ClientId,k:String,v:String},
     Get{cid:ClientId,k:String},
-    Del{cid:ClientId,k:String}
+    Del{cid:ClientId,k:String},
+    SetWithResultSender{//传入一个可以返回结果的sender
+        sender:tokio::sync::oneshot::Sender<PaKvOpeResult>,
+        k:String,v:String,
+    },
+    GetWithResultSender{
+        sender:tokio::sync::oneshot::Sender<PaKvOpeResult>,
+        k:String
+    },
+    DelWithResultSender{
+        sender:tokio::sync::oneshot::Sender<PaKvOpeResult>,
+        k:String
+    },
+}
+impl NetMsg2App{
+    pub fn make_result_chan()->(tokio::sync::oneshot::Sender<PaKvOpeResult>,
+                                tokio::sync::oneshot::Receiver<PaKvOpeResult>){
+        let chan=tokio::sync::oneshot::channel();
+        chan
+    }
 }
 #[derive(Clone)]
 pub struct NetMsg2AppSender {

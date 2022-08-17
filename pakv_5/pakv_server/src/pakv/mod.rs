@@ -99,18 +99,20 @@ pub enum KernelWorker2Main {
     },
 }
 
-pub enum KernelToAppMsg {
+#[derive(Clone,Debug)]
+pub enum PaKvOpeResult {
     SetResult {
-        opeid: PaKVOpeId,
     },
     DelResult {
-        opeid: PaKVOpeId,
         succ: bool,
     },
     GetResult {
-        opeid: PaKVOpeId,
         v: Option<String>,
     },
+}
+pub struct  KernelToAppMsg {
+    pub opeid: PaKVOpeId,
+    pub res:PaKvOpeResult
 }
 
 //内核其他协程向主协程发送
@@ -295,15 +297,18 @@ impl PaKVCtx {
                 opeid,k,pos
             } => {
                 self.store.set(k,&pos);
-                return KernelToAppMsg::SetResult {
-                    opeid
+                return KernelToAppMsg {
+                    opeid,
+                    res:PaKvOpeResult::SetResult {}
                 };
             }
             KernelWorker2Main::AfterGetRead {
                 opeid,v
             } => {
-                return KernelToAppMsg::GetResult {
-                    opeid,v:Some(v)
+                return KernelToAppMsg {
+                    opeid,res:PaKvOpeResult::GetResult {
+                        v:Some(v)
+                    }
                 };
             }
             KernelWorker2Main::AfterDelAppend {
@@ -311,8 +316,10 @@ impl PaKVCtx {
             } => {
                 let r=self.store.del(&k);
 
-                return KernelToAppMsg::DelResult {
-                    opeid,succ:r.is_some()
+                return KernelToAppMsg {
+                    opeid,res:PaKvOpeResult::DelResult {
+                        succ:r.is_some()
+                    }
                 };
             }
         }

@@ -68,7 +68,7 @@ impl FilePos {
 
 #[derive(Clone,Debug)]
 pub struct LogFileId {
-    pub(crate) id: u64,
+    pub id: u64,
 }
 
 impl LogFileId {

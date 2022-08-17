@@ -6,12 +6,12 @@
     // use crate::net::{ReceiveHandlerKernel};
     use tokio::macros::support::Future;
 
-    const MsgPackHeadSize: u8 = 4;
+    const MSG_PACK_HEAD_SIZE: u8 = 4;
 
     //描述数据包头
     #[derive(Default, Debug)]
     struct MsgPackHead {
-        pack_id: u8,
+        // pack_id: u8,
         pack_len: u32,
     }
 
@@ -45,8 +45,8 @@
             while self.handled_offset < _byte_cnt {
                 let byte_cnt_left = _byte_cnt - self.handled_offset;
                 //头本次还是未收全
-                if self.head_rec_cnt < MsgPackHeadSize {
-                    if byte_cnt_left + (self.head_rec_cnt as usize) < MsgPackHeadSize as usize {
+                if self.head_rec_cnt < MSG_PACK_HEAD_SIZE {
+                    if byte_cnt_left + (self.head_rec_cnt as usize) < MSG_PACK_HEAD_SIZE as usize {
                         for i in 0..byte_cnt_left {
                             self.head_buff[(self.head_rec_cnt as usize) + i]
                                 = buffset[self.handled_offset + i];
@@ -54,14 +54,14 @@
                         self.head_rec_cnt += byte_cnt_left as u8;
                     }//头本次收全
                     else {
-                        let cpylen = MsgPackHeadSize - self.head_rec_cnt;
+                        let cpylen = MSG_PACK_HEAD_SIZE - self.head_rec_cnt;
                         for i in 0..cpylen {
                             self.head_buff[(self.head_rec_cnt + i) as usize] =
                                 buffset[self.handled_offset + i as usize];
                         }
-                        self.handled_offset += (MsgPackHeadSize - self.head_rec_cnt) as usize;
+                        self.handled_offset += (MSG_PACK_HEAD_SIZE - self.head_rec_cnt) as usize;
                         self.calc_pack_head();
-                        self.head_rec_cnt = MsgPackHeadSize;
+                        self.head_rec_cnt = MSG_PACK_HEAD_SIZE;
                         //扩大缓冲区
                         if (self.pack_head.pack_len > self.body_buff.len() as u32) {
                             self.body_buff.resize(self.pack_head.pack_len as usize, 0);

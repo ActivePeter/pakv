@@ -12,8 +12,8 @@ use crate::net::msg2app_sender::NetMsg2AppSender;
 pub type ClientId = u64;
 
 fn write_loop(cid: ClientId, mut writer: OwnedWriteHalf) -> Server2ClientSender {
-    let (t, mut r): (Sender<Server2ClientMsg>, Receiver<Server2ClientMsg>) = tokio::sync::mpsc::channel(10);
-
+    let (t, mut r)=
+        Server2ClientSender::new();
     tokio::spawn(async move {
         loop {
             let to_client = r.recv().await.unwrap();
@@ -30,8 +30,7 @@ fn write_loop(cid: ClientId, mut writer: OwnedWriteHalf) -> Server2ClientSender 
         }
         info!("writeloop end");
     });
-
-    Server2ClientSender::new(t)
+    t
 }
 
 async fn read_loop(cid: ClientId, c2s: NetMsg2AppSender, mut r: OwnedReadHalf) {
@@ -61,7 +60,7 @@ async fn read_loop(cid: ClientId, c2s: NetMsg2AppSender, mut r: OwnedReadHalf) {
                 }
             }
         }
-        c2s.client_out(cid);
+        c2s.client_out(cid).await;
         info!("readloop end");
     });
     // });

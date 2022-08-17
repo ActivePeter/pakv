@@ -1,5 +1,4 @@
-use tokio::sync::mpsc::Sender;
-use pakv_server_lib::pakv::KernelToAppMsg;
+use tokio::sync::mpsc::{Sender, Receiver};
 use crate::net::msg_gen;
 
 #[derive(Debug)]
@@ -20,10 +19,13 @@ pub struct Server2ClientSender {
     _sender:Sender<Server2ClientMsg>
 }
 impl Server2ClientSender {
-    pub fn new(sender:Sender<Server2ClientMsg>) -> Server2ClientSender {
-        Server2ClientSender {
-            _sender:sender
-        }
+    pub fn new()
+        -> (Server2ClientSender, Receiver<Server2ClientMsg>) {
+        let (t, r): (Sender<Server2ClientMsg>, Receiver<Server2ClientMsg>)
+            = tokio::sync::mpsc::channel(10);
+        (Server2ClientSender {
+            _sender:t
+        },r)
     }
     pub async fn set_rpl(&self, succ:bool){
         self._sender.send(

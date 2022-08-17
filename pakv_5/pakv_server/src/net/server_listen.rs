@@ -22,7 +22,7 @@ pub async fn start_wait_client() -> Receiver<NetMsg2App> {
     tokio::spawn(async move {
         let listener = TokioTcpListener::bind(ADDRESS).await.unwrap();
         loop {
-            let (mut stream, _addr) = listener.accept().await.unwrap();
+            let (stream, _addr) = listener.accept().await.unwrap();
             // tokio::spawn(async move {
             //stream.read_f32().await;
             let s2csender = server_rw_eachclient::handle_stream(
