@@ -13,6 +13,7 @@ pub mod server2client;
 pub mod net;
 pub mod server_app;
 pub mod server_app_consume;
+mod conccurent_bench;
 // pub mod msg_gen;
 // pub mod msg_match;
 
@@ -21,19 +22,12 @@ async fn main() {
     env_logger::init();//remember to set RUST_LOG=INFO
     println!("starting up");
 
-    // tokio::spawn(async move{
-        //处理内核运行以及，客户端消息
-    // });
+    conccurent_bench::conccurent_bench();
 
-
-    // tokio::spawn(async move{
-        //监听客户端
-        let recv=
-            server_listen::start_wait_client().await;
-
-
-    server_app::PaKVServerApp::new().await
-        .hold(recv).await;
-    // });
-
+    // //监听客户端
+    // let recv=
+    //     server_listen::start_wait_client().await;
+    //
+    // server_app::PaKVServerApp::new().await
+    //     .hold(recv).await;
 }

@@ -173,8 +173,8 @@ pub async fn start_worker(send2main: KernelOtherWorkerSend2SelfMain) -> KernelMa
     let (s, mut r) =
         KernelMain2WorkerSend::new();
 
-    // tokio::task::spawn_blocking(
-    std::thread::spawn(
+    tokio::task::spawn_blocking(
+    // std::thread::spawn(
         move ||{
         PaKvFileWorker::new().hold(r,send2main);
     });
