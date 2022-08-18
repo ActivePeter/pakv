@@ -9,7 +9,7 @@ with synchronous networking over a custom protocol.
 - x Use channels for cross-thread communication
 - (只用了通道) Share data structures with locks
 - x Perform read operations without locks
-- Benchmark single-threaded vs multithreaded
+- x Benchmark single-threaded vs multithreaded
 
 **Topics**: thread pools, channels, locks, lock-free data structures,
   atomics, parameterized benchmarking.
