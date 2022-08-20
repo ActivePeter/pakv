@@ -9,6 +9,7 @@ use std::fs::{OpenOptions, File};
 use std::io::{SeekFrom, Seek};
 use crate::pakv::file::compact::Compactor;
 use std::collections::HashMap;
+use crate::pakv::file::meta::MetaFileOpe;
 
 #[derive(Debug)]
 pub enum WRWorkerTask {
@@ -88,22 +89,26 @@ impl PaKvFileWorker {
         struct CurFileStates{
             pub file:Option<File>,
             pub curpos:u64,
-            pub fid:LogFileId
+            pub fid:LogFileId,
+            metafile_ope: MetaFileOpe,
         }
+        // let mut appendcnt=0;
         let mut curf_states=CurFileStates{
+            metafile_ope:MetaFileOpe::create(),
             file: None,
             curpos: 0,
             fid: LogFileId { id: 0 }
         };
         let mut compactor=None;
         fn tarfileset(fstate:&mut CurFileStates,tarfid:LogFileId){
-            println!("tar file set in worker");
+            // println!("tar file set in worker");
             fstate.file.replace(OpenOptions::new()
                 .create(true)
                 .write(true)
                 .append(true)
                 .open(tarfid.get_pathbuf()).unwrap());
             fstate.curpos=fstate.file.as_mut().unwrap().seek(SeekFrom::End(0)).unwrap();
+            fstate.metafile_ope.set_usertar_fid(tarfid.id);
             fstate.fid=tarfid;
         }
         self.pre_collect_dir();
@@ -113,6 +118,7 @@ impl PaKvFileWorker {
                     WRWorkerTask::SetAppend {
                         opeid, k, v
                     } => {
+                        // appendcnt+=1;
                         let ope = KvOpe {
                             ope: KvOpeE::KvOpeSet { k, v }
                         };
@@ -183,6 +189,8 @@ impl PaKvFileWorker {
                 //没有正在压缩的任务
                 if (&compactor).is_none(){
                     if Compactor::if_need_compact(curf_states.curpos){
+                        // println!("append cnt {} {}",appendcnt,curf_states.fid.id);
+                        // appendcnt=0;
                         compactor=Some(Compactor::new());
                         if let Some(comp)=&mut compactor{
                             let mut fid =curf_states.fid.clone();
@@ -203,6 +211,7 @@ impl PaKvFileWorker {
                             comp.calc_kvranked();
                             comp.startpact();
                             std::mem::swap(&mut comp.disactived_files,&mut self.disactived_files);
+                            compactor=None;
                         }
                     }
                 }

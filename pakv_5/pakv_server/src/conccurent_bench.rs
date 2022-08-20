@@ -14,21 +14,25 @@ pub fn conccurent_bench(){
     //创建多个task，进行set并等待结果，看一秒内，有多少个成功收到结果
     for _i in 0..10{
         let t = t.clone();
-        tokio::spawn(async move {
+        std::thread::spawn(move ||{
             loop {
                 let (t1, r1) =
                     NetMsg2App::make_result_chan();
-                t.send(NetMsg2App::SetWithResultSender {
+                t.blocking_send(NetMsg2App::SetWithResultSender {
                     sender: t1,
                     k: "ggg".to_string(),
                     v: "ggg".to_string()
-                }).await.unwrap();
-                let _r = r1.await.unwrap();
+                }).unwrap();
+                let _r = r1.blocking_recv().unwrap();
                 TOTAL.fetch_add(1, Ordering::Release);//内存屏障，防止乱序优化
             }
         });
     }
-
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    println!("total set {}",TOTAL.load(Ordering::Relaxed));
+    let mut vlast=0;
+    for _i in 0..10{
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let v=TOTAL.load(Ordering::Relaxed);
+        println!("total set {}",v-vlast);
+        vlast=v;
+    }
 }
