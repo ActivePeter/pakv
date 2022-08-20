@@ -17,7 +17,16 @@ with synchronous networking over a custom protocol.
 
 In this project you will create a simple key/value server and client. They will communicate with a custom networking protocol of your design. You will emit logs using standard logging crates, and handle errors correctly across the network boundary. Once you have a working client-server architecture, then you will abstract the storage engine behind traits, and compare the performance of yours to the [`sled`] engine.
 
-[Records](./rec.md)
+## 程序运行流程
+
+- client
+  - 等待输入
+  - 输入一行，创建tcp短链接，发送给服务端
+  - 读取返回信息，解析输出到命令行
+- server
+  - 初始化kv内核
+  - 启动服务端，监听新的链接，解析接受数据，转换为消息枚举发给kv内核
+  - 等待kv内核结果，返回给客户端
 
 ## Record
 

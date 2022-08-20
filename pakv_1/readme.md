@@ -127,5 +127,3 @@ mod tests {
 
 ![image-20220728162228370](https://hanbaoaaa.xyz/tuchuang/images/2022/07/28/image-20220728162228370.png)
 
-可能的解决办法 [Rust | CLion (jetbrains.com)](https://www.jetbrains.com/help/clion/rust-support.html#project-settings)
-

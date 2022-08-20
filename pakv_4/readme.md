@@ -23,7 +23,41 @@ concurrent implementations. The in-memory index will become a concurrent
 data structure, shared by all threads, and compaction will be done on a
 dedicated thread, to reduce latency of individual requests.
 
-### 记录
+## 程序运行流程
+
+- client
+
+  - 等待输入
+  - 输入一行，创建tcp短链接，发送给服务端
+  - 读取返回信息，解析输出到命令行
+
+- server
+
+  - 初始化kv内核
+
+  - 启动线程池
+
+  - 启动服务端，监听新的链接，
+
+    - 有新链接，通过线程池的消息通道传递给线程池处理链接的任务
+
+      ```rust
+      let chandle=ClientHandle::new(self.pakvchan.clone());
+                  tphandle.execute(move ||{
+                      chandle.handle_connection(stream);
+                  })
+      ```
+
+    - 解析接受数据，转换为消息枚举发给kv内核
+
+    - 等待kv内核结果，返回给客户端
+
+## 注意点
+
+- 线程池采用crossbeam的多生产多消费通道，
+  - 每个线程持有一个接收器，阻塞接受新的任务，收到执行则进行阻塞执行
+
+## 记录
 
 分析：客户端连入后，
 

@@ -5,14 +5,14 @@ use crate::net::msg2app_sender::NetMsg2App;
 static TOTAL: AtomicUsize = AtomicUsize::new(0);
 
 pub fn conccurent_bench(){
-    let (t, r)=tokio::sync::mpsc::channel(10);
+    let (t, r)=tokio::sync::mpsc::channel(100);
     tokio::spawn(async move{
         server_app::PaKVServerApp::new().await
             .hold(r).await;
     });
     std::thread::sleep(std::time::Duration::from_secs(10));
     //创建多个task，进行set并等待结果，看一秒内，有多少个成功收到结果
-    for _i in 0..10{
+    for _i in 0..8{
         let t = t.clone();
         std::thread::spawn(move ||{
             loop {
