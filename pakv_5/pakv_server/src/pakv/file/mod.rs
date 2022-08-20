@@ -6,7 +6,7 @@ pub mod fileio;
 
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, read_dir, File};
-use std::io::{BufReader, BufRead, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufRead, Seek, SeekFrom};
 use crate::pakv::{PaKVCtx};
 // use serde_json::Error;
 use std::{fs, slice};
@@ -180,25 +180,6 @@ pub fn logfile_gothroughlogs(file: &File, mut handle_one_ope: impl FnMut(u64, &S
 }
 
 
-
-
-
-fn scan_log_files() -> Vec<LogFileId> {
-    let path = Path::new(pathstr_of_logfile());
-    let mut v = vec![];
-    let r = read_dir(path).unwrap();
-    for dir_ in r {
-        let dir = dir_.unwrap();
-        let meta = dir.metadata().unwrap();
-        if meta.is_file() {
-            let fid_ = LogFileId::from_path(dir.path());
-            if let Some(fid) = fid_ {
-                v.push(fid);
-            }
-        }
-    }
-    return v;
-}
 // fn collect_log_files(except:Vec<LogFileId>){
 //     let path=Path::new(path_logfile());
 //     let r=read_dir(path).unwrap();

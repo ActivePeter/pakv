@@ -1,17 +1,14 @@
 use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
-use std::io::Error;
-use crate::server2client::{Server2ClientSender, Server2ClientMsg};
-use crate::*;
-use crate::net::{msg_parse, msg_match};
+use crate::server2client::{Server2ClientSender};
+use crate::net::{ msg_match};
 use crate::net::msg_parse::MsgParser;
 use crate::net::msg2app_sender::NetMsg2AppSender;
 
 pub type ClientId = u64;
 
-fn write_loop(cid: ClientId, mut writer: OwnedWriteHalf) -> Server2ClientSender {
+fn write_loop(_cid: ClientId, mut writer: OwnedWriteHalf) -> Server2ClientSender {
     let (t, mut r)=
         Server2ClientSender::new();
     tokio::spawn(async move {
@@ -66,9 +63,9 @@ async fn read_loop(cid: ClientId, c2s: NetMsg2AppSender, mut r: OwnedReadHalf) {
     // });
 }
 
-pub async fn handle_stream(cid: ClientId, c2s: &NetMsg2AppSender, mut stream: TcpStream)
+pub async fn handle_stream(cid: ClientId, c2s: &NetMsg2AppSender, stream: TcpStream)
                            -> Server2ClientSender {
-    let (mut rx, tx) = stream.into_split();
+    let ( rx, tx) = stream.into_split();
     let c2s = c2s.clone();
 
     read_loop(cid, c2s.clone(), rx).await;

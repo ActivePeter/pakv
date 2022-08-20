@@ -1,10 +1,9 @@
 
 //处理tcp收发粘包半包
 // pub mod msg_pack_make {
-    use byteorder::{LittleEndian, BigEndian, ByteOrder};
+    use byteorder::{ BigEndian, ByteOrder};
     // use crate::net_pack_convert::{MsgEnum, bytes_to_pack};
     // use crate::net::{ReceiveHandlerKernel};
-    use tokio::macros::support::Future;
 
     const MSG_PACK_HEAD_SIZE: u8 = 4;
 
@@ -63,7 +62,7 @@
                         self.calc_pack_head();
                         self.head_rec_cnt = MSG_PACK_HEAD_SIZE;
                         //扩大缓冲区
-                        if (self.pack_head.pack_len > self.body_buff.len() as u32) {
+                        if self.pack_head.pack_len > self.body_buff.len() as u32 {
                             self.body_buff.resize(self.pack_head.pack_len as usize, 0);
                         }
                         // continue;

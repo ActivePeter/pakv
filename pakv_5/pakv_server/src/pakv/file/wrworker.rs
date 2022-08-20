@@ -1,7 +1,6 @@
 //通过读写worker进行写入操作，完成后
 
-use crate::pakv::{PaKVCtx, PaKVOpeId, KernelOtherWorkerSend2SelfMain};
-use std::future::Future;
+use crate::pakv::{ PaKVOpeId, KernelOtherWorkerSend2SelfMain};
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::pakv::file::serial::{KvOpe, KvOpeE};
 use crate::pakv::file::wrworker::WRWorkerTask::{SetAppend, DelAppend, GetRead, TarFileSet};
@@ -72,7 +71,7 @@ impl KernelMain2WorkerSend {
 
 struct PaKvFileWorker {
     // pub
-    disactived_files:HashMap<u64,File>
+    disactived_files:HashMap<u64,()>
 }
 
 impl PaKvFileWorker {
@@ -81,8 +80,8 @@ impl PaKvFileWorker {
     }
     fn pre_collect_dir(&mut self){
         let files=fileio::get_dirfiles_rank_by_time(fileio::get_folder_path());
-        for (a,b) in files{
-            self.disactived_files.insert(b.0.id,b.1);
+        for (_a,b) in files{
+            self.disactived_files.insert(b.0.id,());
         }
     }
     pub fn hold(&mut self, mut r: Receiver<WRWorkerTask>,send2main: KernelOtherWorkerSend2SelfMain) {
@@ -100,12 +99,13 @@ impl PaKvFileWorker {
         fn tarfileset(fstate:&mut CurFileStates,tarfid:LogFileId){
             println!("tar file set in worker");
             fstate.file.replace(OpenOptions::new()
+                .create(true)
                 .write(true)
                 .append(true)
                 .open(tarfid.get_pathbuf()).unwrap());
             fstate.curpos=fstate.file.as_mut().unwrap().seek(SeekFrom::End(0)).unwrap();
             fstate.fid=tarfid;
-        };
+        }
         self.pre_collect_dir();
         loop {
             if let Some(rr) = r.blocking_recv() {
@@ -164,7 +164,7 @@ impl PaKvFileWorker {
                         let ope = KvOpe::from_str(&*l).unwrap();
                         match ope.ope {
                             //为set记录，正确
-                            KvOpeE::KvOpeSet { k, v } => {
+                            KvOpeE::KvOpeSet { k:_, v } => {
                                 send2main.after_get_read(opeid,v);
                             }
                             _ => {
@@ -183,19 +183,14 @@ impl PaKvFileWorker {
                 //没有正在压缩的任务
                 if (&compactor).is_none(){
                     if Compactor::if_need_compact(curf_states.curpos){
-                        compactor=Some(Compactor{
-                            kv: Default::default(),
-                            kvranked: Default::default(),
-                            disactived_files: Default::default(),
-                            curfid: 0
-                        });
+                        compactor=Some(Compactor::new());
                         if let Some(comp)=&mut compactor{
                             let mut fid =curf_states.fid.clone();
                             {
                                 {//1.从state取出当前文件句柄File
                                     let mut f = None;
                                     std::mem::swap(&mut f, &mut curf_states.file);
-                                    comp.disactived_files.insert(fid.id, f.unwrap());
+                                    comp.disactived_files.insert(fid.id, ());
                                 }
                                 //2.获取kv数据并设置要压缩的kv数据
                                 comp.kv = send2main.clone_kv_hash();
@@ -207,6 +202,7 @@ impl PaKvFileWorker {
                                        fid);
                             comp.calc_kvranked();
                             comp.startpact();
+                            std::mem::swap(&mut comp.disactived_files,&mut self.disactived_files);
                         }
                     }
                 }
@@ -218,7 +214,7 @@ impl PaKvFileWorker {
 }
 
 pub async fn start_worker(send2main: KernelOtherWorkerSend2SelfMain) -> KernelMain2WorkerSend {
-    let (s, mut r) =
+    let (s,  r) =
         KernelMain2WorkerSend::new();
 
     tokio::task::spawn_blocking(

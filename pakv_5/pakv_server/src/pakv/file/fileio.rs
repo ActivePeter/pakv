@@ -1,7 +1,7 @@
-use std::path::{PathBuf, Path};
-use std::fs::{OpenOptions, File};
+use std::path::{ Path};
+use std::fs::{ File};
 use std::fs;
-use std::io::{SeekFrom,  BufReader, Write, BufRead};
+use std::io::{  BufReader, Write, BufRead};
 use crate::pakv::PaKVCtx;
 use std::collections::BTreeMap;
 use crate::pakv::file::{LogFileId, FilePos};
@@ -100,7 +100,7 @@ pub async fn file_check(ctx: &mut PaKVCtx) {
     let tarfid = ctx.meta_file_ope.get_usertar_fid();
 
     //3.遍历文件夹下的文件,对文件编辑时间进行排序
-    let mut rank_by_edit_time=get_dirfiles_rank_by_time(path);
+    let rank_by_edit_time=get_dirfiles_rank_by_time(path);
 
     //从文件中读取记录到内存中
     fn file_readlogs(ctx: &mut PaKVCtx, fid: LogFileId, file: &mut File) {
