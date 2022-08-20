@@ -4,27 +4,32 @@ use crate::pakv::{KernelWorker2Main, KernelToAppMsg, PaKvOpeResult};
 
 impl PaKVServerApp {
     pub async fn consume_kernel(&mut self, msg: KernelWorker2Main) {
-        let res = self.kernel.consume_selfmsg(msg);
-        let requster = self.consume_requester_of_opeid(res.opeid);
-        match requster {
-            Requester::NetClient(cid) => {
-                let c_ = self.clients_cid2sender.get(&cid);
-                if let Some(c) = c_ {
-                    match res.res {
-                        PaKvOpeResult::SetResult { .. } => {
-                            c.set_rpl(true).await;
-                        }
-                        PaKvOpeResult::DelResult { succ } => {
-                            c.del_rpl(succ).await;
-                        }
-                        PaKvOpeResult::GetResult { v } => {
-                            c.get_rpl(v).await;
+        let res = self.kernel.consume_selfmsg(msg).await;
+        match res{
+            None => {}//其他事务
+            Some(res) => {
+                let requster = self.consume_requester_of_opeid(res.opeid);
+                match requster {
+                    Requester::NetClient(cid) => {
+                        let c_ = self.clients_cid2sender.get(&cid);
+                        if let Some(c) = c_ {
+                            match res.res {
+                                PaKvOpeResult::SetResult { .. } => {
+                                    c.set_rpl(true).await;
+                                }
+                                PaKvOpeResult::DelResult { succ } => {
+                                    c.del_rpl(succ).await;
+                                }
+                                PaKvOpeResult::GetResult { v } => {
+                                    c.get_rpl(v).await;
+                                }
+                            }
                         }
                     }
+                    Requester::ChannelSendBack(send) => {
+                        send.send(res.res).unwrap();
+                    }
                 }
-            }
-            Requester::ChannelSendBack(send) => {
-                send.send(res.res).unwrap();
             }
         }
     }

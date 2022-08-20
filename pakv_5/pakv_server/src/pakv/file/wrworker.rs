@@ -8,6 +8,8 @@ use crate::pakv::file::wrworker::WRWorkerTask::{SetAppend, DelAppend, GetRead, T
 use crate::pakv::file::{fileio, LogFileId, FilePos};
 use std::fs::{OpenOptions, File};
 use std::io::{SeekFrom, Seek};
+use crate::pakv::file::compact::Compactor;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum WRWorkerTask {
@@ -70,21 +72,41 @@ impl KernelMain2WorkerSend {
 
 struct PaKvFileWorker {
     // pub
+    disactived_files:HashMap<u64,File>
 }
 
 impl PaKvFileWorker {
     pub fn new() -> PaKvFileWorker {
-        return PaKvFileWorker {};
+        return PaKvFileWorker { disactived_files: Default::default() };
     }
-
+    fn pre_collect_dir(&mut self){
+        let files=fileio::get_dirfiles_rank_by_time(fileio::get_folder_path());
+        for (a,b) in files{
+            self.disactived_files.insert(b.0.id,b.1);
+        }
+    }
     pub fn hold(&mut self, mut r: Receiver<WRWorkerTask>,send2main: KernelOtherWorkerSend2SelfMain) {
-
-
-        let mut file1=None;
-        let mut curpos:u64=0;
-        let mut fid=LogFileId{
-            id: 0
+        struct CurFileStates{
+            pub file:Option<File>,
+            pub curpos:u64,
+            pub fid:LogFileId
+        }
+        let mut curf_states=CurFileStates{
+            file: None,
+            curpos: 0,
+            fid: LogFileId { id: 0 }
         };
+        let mut compactor=None;
+        fn tarfileset(fstate:&mut CurFileStates,tarfid:LogFileId){
+            println!("tar file set in worker");
+            fstate.file.replace(OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(tarfid.get_pathbuf()).unwrap());
+            fstate.curpos=fstate.file.as_mut().unwrap().seek(SeekFrom::End(0)).unwrap();
+            fstate.fid=tarfid;
+        };
+        self.pre_collect_dir();
         loop {
             if let Some(rr) = r.blocking_recv() {
                 match rr {
@@ -94,17 +116,17 @@ impl PaKvFileWorker {
                         let ope = KvOpe {
                             ope: KvOpeE::KvOpeSet { k, v }
                         };
-                        if let Some(f)=&mut file1{
+                        if let Some(f)=&mut curf_states.file{
                             let p=fileio::file_append_log(
                                 f,
                                 serde_json::to_string(&ope).unwrap());
                             match ope.ope{
                                 KvOpeE::KvOpeSet { k,..} => {
                                     send2main.after_set_append(opeid,FilePos{
-                                        file_id: fid.id,
-                                        pos: curpos
+                                        file_id: (&curf_states.fid).id,
+                                        pos: (&curf_states).curpos
                                     },k);
-                                    curpos+=p;
+                                    curf_states.curpos+=p;
                                 }
                                 _ => {panic!("impossible")}
                             }
@@ -118,7 +140,7 @@ impl PaKvFileWorker {
                         let ope = KvOpe {
                             ope: KvOpeE::KvOpeDel { k }
                         };
-                        if let Some(f)=&mut file1{
+                        if let Some(f)=&mut curf_states.file{
                             let p=fileio::file_append_log(
                                 f,
                                 serde_json::to_string(&ope).unwrap());
@@ -128,7 +150,7 @@ impl PaKvFileWorker {
                                 }
                                 _ => {}
                             }
-                            curpos+=p;
+                            curf_states.curpos+=p;
                         }else{
                             panic!("f not exist");
                         }
@@ -153,13 +175,39 @@ impl PaKvFileWorker {
                     WRWorkerTask::TarFileSet {
                         tarfid
                     } => {
-                        println!("tar file set in worker");
-                        file1 = Some(OpenOptions::new()
-                            .write(true)
-                            .append(true)
-                            .open(tarfid.get_pathbuf()).unwrap());
-                        curpos=file1.as_mut().unwrap().seek(SeekFrom::End(0)).unwrap();
-                        fid=tarfid;
+                        //从未激活文件移出
+                        self.disactived_files.remove(&tarfid.id);
+                        tarfileset(&mut curf_states,tarfid);
+                    }
+                }
+                //没有正在压缩的任务
+                if (&compactor).is_none(){
+                    if Compactor::if_need_compact(curf_states.curpos){
+                        compactor=Some(Compactor{
+                            kv: Default::default(),
+                            kvranked: Default::default(),
+                            disactived_files: Default::default(),
+                            curfid: 0
+                        });
+                        if let Some(comp)=&mut compactor{
+                            let mut fid =curf_states.fid.clone();
+                            {
+                                {//1.从state取出当前文件句柄File
+                                    let mut f = None;
+                                    std::mem::swap(&mut f, &mut curf_states.file);
+                                    comp.disactived_files.insert(fid.id, f.unwrap());
+                                }
+                                //2.获取kv数据并设置要压缩的kv数据
+                                comp.kv = send2main.clone_kv_hash();
+                                //3.设置当前目标写入的文件，压缩目标文件需要避开
+                                comp.curfid = fid.id+1;
+                            }
+                            fid.id+=1;
+                            tarfileset(&mut curf_states,
+                                       fid);
+                            comp.calc_kvranked();
+                            comp.startpact();
+                        }
                     }
                 }
             } else {

@@ -135,6 +135,12 @@ impl LogFileId {
             eprintln!("{}",e);
         }
     }
+    pub fn open_reader(&self) -> BufReader<File> {
+            let file=OpenOptions::new().read(true).open(self.get_pathbuf()).unwrap();
+            let reader = BufReader::new(file);
+
+        reader
+    }
     // pub fn begin_read(&self){
     //     let file=OpenOptions::new().read(true).open(self.get_pathbuf());
     //     let mut reader = BufReader::new(file);
@@ -173,42 +179,8 @@ pub fn logfile_gothroughlogs(file: &File, mut handle_one_ope: impl FnMut(u64, &S
     }
 }
 
-//old no async
-pub fn file_append_log(filepath: &PathBuf, mut str: String) -> Option<u64> {
-    // match ctx.tarfpath.clone(){
-    //     None => {
-    //         panic!("tar path is not chosen");
-    //     }
-    //     Some(p) => {
-    let filer = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(filepath);
-    match filer {
-        Ok(mut file) => {
-            // file.stream_position()
-            let o = file.seek(SeekFrom::End(0)).unwrap();
-            // println!("cur pos {}", o);
-            str.push('\n');
-            // file.
-            file.write(str.as_bytes()).unwrap();
-            return Some(o);
-            // // let v=["\n"];
-            // file.write("\n".as_bytes()).unwrap();
 
-            // let s=&*str;
-            // if let Err(e) = writeln!(file,s) {
-            //     eprintln!("Couldn't write to file: {}", e);
-            // }
-        }
-        Err(e) => {
-            panic!("open tar file failed {}",e);
-        }
-    }
 
-}
-
-const LOG_FILE_MAX:u64 =1 << 20;
 
 
 fn scan_log_files() -> Vec<LogFileId> {

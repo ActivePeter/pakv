@@ -15,6 +15,7 @@ use file::serial::{KvOpe, KvOpeE};
 // use crate::pakv::channel_caller::{App2KernelSender, PaKVCtxChanCallerForSys};
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::pakv::file::wrworker::{WRWorkerTask, KernelMain2WorkerSend};
+use std::collections::hash_map::RandomState;
 // use crate::r#mod;
 
 
@@ -52,35 +53,6 @@ impl KVStore {
     }
 }
 
-// pub enum KvOpeCmd {
-//     KvClientIn {
-//         cid: u64,
-//         client_handle: PaKVClientHandle,
-//     },
-//     KvClientOut {
-//         cid: u64
-//     },
-//     KvOpeSet {
-//         k: String,
-//         v: String,
-//         // resp:sync::mpsc::Sender<bool>
-//     },
-//     KvOpeDel {
-//         k: String,
-//         // resp:sync::mpsc::Sender<bool>
-//     },
-//     KvOpeGet {
-//         k: String,
-//         // resp:sync::mpsc::Sender<Option<String>>
-//     },
-//
-//     SysKvOpeBatchUpdate {
-//         fid: LogFileId,
-//         map_k2pos: HashMap<String, u64>,
-//         resp: sync::mpsc::Sender<bool>,
-//     },
-//     SysKvOpeCompactEnd {},
-// }
 
 //在wrworker执行完后传递给主循环，
 // 主循环在交给内核selfconsume，进行后续的set
@@ -97,6 +69,9 @@ pub enum KernelWorker2Main {
         opeid:PaKVOpeId,
         k:String,
     },
+    GetKVHashClone{
+        resp:tokio::sync::oneshot::Sender<HashMap<String, FilePos>>
+    }
 }
 
 #[derive(Clone,Debug)]
@@ -125,6 +100,15 @@ impl KernelOtherWorkerSend2SelfMain {
         KernelOtherWorkerSend2SelfMain {
             sender
         }
+    }
+    pub fn clone_kv_hash(&self) -> HashMap<String, FilePos> {
+        let (t,r)=tokio::sync::oneshot::channel();
+        self.sender.blocking_send(KernelWorker2Main::GetKVHashClone {
+            resp:t
+        }).unwrap();
+        let res=r.blocking_recv().unwrap();
+
+        res
     }
     pub fn after_set_append(
         &self, opeid:PaKVOpeId,pos:FilePos,k:String) {
@@ -290,37 +274,42 @@ impl PaKVCtx {
         None
     }
     //在操作完文件后，操作内存数据
-    pub fn consume_selfmsg(&mut self, selfmsg: KernelWorker2Main)
-        ->KernelToAppMsg{
+    pub async fn consume_selfmsg(&mut self, selfmsg: KernelWorker2Main)
+        ->Option<KernelToAppMsg>{
         match selfmsg {
             KernelWorker2Main::AfterSetAppend {
                 opeid,k,pos
             } => {
                 self.store.set(k,&pos);
-                return KernelToAppMsg {
+                return Some(KernelToAppMsg {
                     opeid,
                     res:PaKvOpeResult::SetResult {}
-                };
+                });
             }
             KernelWorker2Main::AfterGetRead {
                 opeid,v
             } => {
-                return KernelToAppMsg {
+                return Some(KernelToAppMsg {
                     opeid,res:PaKvOpeResult::GetResult {
                         v:Some(v)
                     }
-                };
+                });
             }
             KernelWorker2Main::AfterDelAppend {
                 opeid,k
             } => {
                 let r=self.store.del(&k);
 
-                return KernelToAppMsg {
+                return Some(KernelToAppMsg {
                     opeid,res:PaKvOpeResult::DelResult {
                         succ:r.is_some()
                     }
-                };
+                });
+            }
+            KernelWorker2Main::GetKVHashClone {
+                resp}=>{
+                resp.send(self.store.map.clone()).unwrap();
+                None
             }
         }
     }

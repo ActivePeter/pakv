@@ -6,6 +6,7 @@ use crate::pakv::PaKVCtx;
 use std::collections::BTreeMap;
 use crate::pakv::file::{LogFileId, FilePos};
 use crate::pakv::file::serial::{KvOpe, KvOpeE};
+use std::time::SystemTime;
 
 static FDIR: &str = "./store/";
 
@@ -46,17 +47,13 @@ pub fn logfile_gothroughlogs(file: &File, mut handle_one_ope: impl FnMut(u64, &S
     }
 }
 
-pub async fn file_check(ctx: &mut PaKVCtx) {
-    let path = Path::new(FDIR);
-    //1.缓存文件文件夹
-    if let Err(e) = fs::create_dir(path) {
-        // eprintln!("{}",e);
-        info!("make sure store folder exist {}",e);
-    }
-    ctx.meta_file_ope.makesure_exist();
-    let tarfid = ctx.meta_file_ope.get_usertar_fid();
+pub fn get_folder_path() -> &'static Path {
+     Path::new(FDIR)
+}
 
-    //3.遍历文件夹下的文件,对文件编辑时间进行排序
+pub fn get_dirfiles_rank_by_time<P: AsRef<Path>>(
+    path: P
+) -> BTreeMap<SystemTime, (LogFileId, File)> {
     let r = fs::read_dir(path).unwrap();
     let mut rank_by_edit_time = BTreeMap::new();
     for dir_ in r {
@@ -88,6 +85,22 @@ pub async fn file_check(ctx: &mut PaKVCtx) {
             }
         }
     }
+
+    rank_by_edit_time
+}
+
+pub async fn file_check(ctx: &mut PaKVCtx) {
+    let path = Path::new(FDIR);
+    //1.缓存文件文件夹
+    if let Err(e) = fs::create_dir(path) {
+        // eprintln!("{}",e);
+        info!("make sure store folder exist {}",e);
+    }
+    ctx.meta_file_ope.makesure_exist();
+    let tarfid = ctx.meta_file_ope.get_usertar_fid();
+
+    //3.遍历文件夹下的文件,对文件编辑时间进行排序
+    let mut rank_by_edit_time=get_dirfiles_rank_by_time(path);
 
     //从文件中读取记录到内存中
     fn file_readlogs(ctx: &mut PaKVCtx, fid: LogFileId, file: &mut File) {
