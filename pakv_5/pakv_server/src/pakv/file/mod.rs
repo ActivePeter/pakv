@@ -12,6 +12,7 @@ use crate::pakv::{PaKVCtx};
 use std::{fs, slice};
 use std::collections::{ BTreeMap};
 use serial::{KvOpeE, KvOpe};
+use std::ops::Deref;
 // use std::error::Error;
 // use std::intrinsics::add_with_overflow;
 
@@ -221,6 +222,7 @@ pub fn file_check(ctx: &mut PaKVCtx) {
                 match file.metadata() {
                     Ok(meta) => {
                         let t= meta.modified().unwrap();
+                        println!("rank add {}",fileid.id);
                         rank_by_edit_time.insert(t,(fileid,file));
                         // if meta.len() < minfilelen {
                         //     minfilelen = meta.len();
@@ -236,6 +238,10 @@ pub fn file_check(ctx: &mut PaKVCtx) {
             }
         }
     }
+    println!("rl {}",rank_by_edit_time.len());
+    rank_by_edit_time.iter().for_each(|l|{
+        println!("r {}",(*l.1).0.id);
+    });
     fn file_readlogs(ctx:&mut PaKVCtx,fid:LogFileId,file:&mut File){
         info!("recovering from log file {}",fid.id);
         logfile_gothroughlogs(file, |off, _line, kvope| {

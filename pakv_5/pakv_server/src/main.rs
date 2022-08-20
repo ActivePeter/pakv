@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate log;
 
+use net::server_listen;
+
 
 // pub mod server_listen;
 pub mod pakv;
@@ -20,12 +22,12 @@ async fn main() {
     env_logger::init();//remember to set RUST_LOG=INFO
     println!("starting up");
 
-    conccurent_bench::conccurent_bench();
+    // conccurent_bench::conccurent_bench();
 
     // //监听客户端
-    // let recv=
-    //     server_listen::start_wait_client().await;
+    let recv=
+        server_listen::start_wait_client().await;
     //
-    // server_app::PaKVServerApp::new().await
-    //     .hold(recv).await;
+    server_app::PaKVServerApp::new().await
+        .hold(recv).await;
 }

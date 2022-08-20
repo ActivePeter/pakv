@@ -34,6 +34,7 @@ impl MetaFileOpe{
         match &mut self.store{
             None => {
                 self.store=Some(MetaFileStore::default());
+                self.store.as_mut().unwrap().usertarfid=id;
             }
             Some( v) => {
                 v.usertarfid=id;

@@ -67,6 +67,10 @@ pub enum KernelWorker2Main {
     },
     GetKVHashClone{
         resp:tokio::sync::oneshot::Sender<HashMap<String, FilePos>>
+    },
+    BunchUpdate{
+        fileid:u64,
+        k2off:Vec<(String,usize)>,
     }
 }
 
@@ -305,6 +309,19 @@ impl PaKVCtx {
             KernelWorker2Main::GetKVHashClone {
                 resp}=>{
                 resp.send(self.store.map.clone()).unwrap();
+                None
+            }
+            KernelWorker2Main::BunchUpdate {
+                fileid,k2off
+            }=>{
+                // let mut ks=vec![];
+                for(k,off) in &k2off{
+                    let v=self.store.map
+                        .get_mut(k).unwrap();
+                    v.file_id=fileid;
+                    v.pos=*off as u64;
+                }
+
                 None
             }
         }

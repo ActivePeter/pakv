@@ -6,7 +6,7 @@ use crate::pakv::PaKVCtx;
 use std::collections::BTreeMap;
 use crate::pakv::file::{LogFileId, FilePos};
 use crate::pakv::file::serial::{KvOpe, KvOpeE};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 
 static FDIR: &str = "./store/";
 
@@ -69,7 +69,14 @@ pub fn get_dirfiles_rank_by_time<P: AsRef<Path>>(
                 }
                 match file.metadata() {
                     Ok(meta) => {
-                        let t = meta.modified().unwrap();
+                        let mut t = meta.modified().unwrap();
+                        // println!("ra {} {:?}",fileid.id,t);
+                        loop{
+                            if rank_by_edit_time.get(&t).is_none(){
+                                break;
+                            }
+                            t=t.checked_add(Duration::from_millis(1)).unwrap();
+                        }
                         rank_by_edit_time.insert(t, (fileid, file));
                         // if meta.len() < minfilelen {
                         //     minfilelen = meta.len();
@@ -130,10 +137,11 @@ pub async fn file_check(ctx: &mut PaKVCtx) {
         // println!("cur file id {} tarfid {}",id.id,tarfid);
         if id.id == tarfid {//meta中标记的tarfile是否存在
             tarfile = Some(file);
-            continue;
+            // continue;
+        }else{
+            file_readlogs(ctx, id.clone(), &mut file);
+            latest_fid = id.id;
         }
-        file_readlogs(ctx, id.clone(), &mut file);
-        latest_fid = id.id;
     }
     match tarfile {//meta中标记的tarfile是否存在
         None => {

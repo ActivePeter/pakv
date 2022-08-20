@@ -101,7 +101,7 @@ impl PaKvFileWorker {
         };
         let mut compactor=None;
         fn tarfileset(fstate:&mut CurFileStates,tarfid:LogFileId){
-            // println!("tar file set in worker");
+            println!("tar file set in worker {}",tarfid.id);
             fstate.file.replace(OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -111,7 +111,7 @@ impl PaKvFileWorker {
             fstate.metafile_ope.set_usertar_fid(tarfid.id);
             fstate.fid=tarfid;
         }
-        self.pre_collect_dir();
+
         loop {
             if let Some(rr) = r.blocking_recv() {
                 match rr {
@@ -184,6 +184,7 @@ impl PaKvFileWorker {
                         //从未激活文件移出
                         self.disactived_files.remove(&tarfid.id);
                         tarfileset(&mut curf_states,tarfid);
+                        self.pre_collect_dir();
                     }
                 }
                 //没有正在压缩的任务
@@ -195,11 +196,11 @@ impl PaKvFileWorker {
                         if let Some(comp)=&mut compactor{
                             let mut fid =curf_states.fid.clone();
                             {
-                                {//1.从state取出当前文件句柄File
-                                    let mut f = None;
-                                    std::mem::swap(&mut f, &mut curf_states.file);
-                                    comp.disactived_files.insert(fid.id, ());
-                                }
+                                // {//1.从state取出当前文件句柄File
+                                //     let mut f = None;
+                                //     std::mem::swap(&mut f, &mut curf_states.file);
+                                //     comp.disactived_files.insert(fid.id, ());
+                                // }
                                 //2.获取kv数据并设置要压缩的kv数据
                                 comp.kv = send2main.clone_kv_hash();
                                 //3.设置当前目标写入的文件，压缩目标文件需要避开
@@ -209,7 +210,7 @@ impl PaKvFileWorker {
                             tarfileset(&mut curf_states,
                                        fid);
                             comp.calc_kvranked();
-                            comp.startpact();
+                            comp.startpact(&send2main);
                             std::mem::swap(&mut comp.disactived_files,&mut self.disactived_files);
                             compactor=None;
                         }
