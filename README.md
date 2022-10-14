@@ -1,5 +1,15 @@
 # pakv_talentplan
-talentplan rust practice course. [talent-plan/lesson-plan.md at master · pingcap/talent-plan (github.com)](https://github.com/pingcap/talent-plan/blob/master/courses/rust/docs/lesson-plan.md)
+talentplan rust practice course. [talent-plan/lesson-plan.md ](https://github.com/pingcap/talent-plan/blob/master/courses/rust/docs/lesson-plan.md)
+
+A simple KV DB implemented in rust.
+
+## features
+
+- bitcast mode. (index by mem, store by log)
+
+## todo
+- compress when reach threshold.
+- bufferpool to speed up get.
 
 [Practical Networked Applications in Rust](https://github.com/pingcap/talent-plan/blob/master/courses/rust/README.md)
 

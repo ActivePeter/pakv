@@ -10,6 +10,7 @@ use parking_lot::RwLock;
 use serial::KvOpe;
 use file::DbFileHandle;
 use file::FilePos;
+use std::fs;
 // use std::sync::RwLock;
 
 // use file::{LogFileId, FilePos};
@@ -50,6 +51,20 @@ struct PaKVCtxLock{
     pub store: KVIndexStore,
     pub file:DbFileHandle
 }
+impl PaKVCtxLock {
+    pub fn readall(&mut self){
+        self.file.iter_start();
+        while let Some((v,pos))=self.file.iter_readline() {
+            match v.ope{
+                serial::KvOpeE::KvOpeSet { k, v } =>{
+                     self.store.set(k, FilePos { offset:pos });},
+                serial::KvOpeE::KvOpeDel { k } =>{
+                     self.store.del(&k);
+                    },
+            }
+        }
+    }
+}
 
 //提供外部调用的接口
 pub struct PaKVCtx {
@@ -59,38 +74,43 @@ pub struct PaKVCtx {
 
 impl PaKVCtx {
     pub fn create() -> PaKVCtx {
+        let path= "./default".to_string();
+        fs::create_dir_all(&*path).unwrap();
         let kvctx=PaKVCtx{
             locked:RwLock::new(PaKVCtxLock {
                 store:KVIndexStore::create(),
                 file:DbFileHandle::create("./default/db".to_string()).unwrap()
             }), 
-            path: "./default".to_string()
+            path
         };
-
+        kvctx.locked.write().readall();
         return kvctx;
     }
     pub fn create_with_name(name:String)->PaKVCtx{
+        let path= format!("./{}",name);
+        fs::create_dir_all(&*path).unwrap();
         let kvctx=PaKVCtx{
             locked:RwLock::new(PaKVCtxLock {
                 store:KVIndexStore::create(),
                 file:DbFileHandle::create(format!("./{}/db",name)).unwrap()
             }), 
-            path: format!("./{}",name)
+            path
         };
         return kvctx;
     }
 
     //return old value
-    pub fn set(&mut self, k: String, v: String) -> Option<String> {
+    pub fn set(&self, k: String, v: String) -> Option<String> {
         let ope=KvOpe::create(serial::KvOpeE::KvOpeSet { k:k.clone(), v });
         let mut hold=self.locked.write();
         let appendedpos=hold.file.append_log(ope.to_str()+"\n");
+        println!("set pos{}",appendedpos.offset);
         hold.store.set(k, appendedpos);
         return None;
     }
 
     //return old value 
-    pub fn del(&mut self, k: String) -> Option<String> {
+    pub fn del(&self, k: String) -> Option<String> {
         let mut hold=self.locked.write();
         if hold.store.get(&k).is_some(){
             let ope=KvOpe::create(serial::KvOpeE::KvOpeDel { k:k.clone() });
@@ -103,7 +123,7 @@ impl PaKVCtx {
     }
 
     //return value
-    pub fn get(&mut self, k: String) -> Option<String> {
+    pub fn get(&self, k: String) -> Option<String> {
         let mut hold=self.locked.write();
         let mut fp:Option<FilePos>=None;
         match hold.store.get(&k){
