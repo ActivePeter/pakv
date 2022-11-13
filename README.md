@@ -33,6 +33,14 @@ A simple KV DB implemented in rust. The main project is in folder pakv_kernel.
 - bufferpool to speed up get.
 - muti store engine（lsm）
 
+## tests
+
+- continuous set (single thread)
+
+  ![image-20221113130934862](README.assets\image-20221113130934862.png)
+
+- 
+
 [Practical Networked Applications in Rust](https://github.com/pingcap/talent-plan/blob/master/courses/rust/README.md)
 
 [lesson-plan](https://github.com/pingcap/talent-plan/blob/master/courses/rust/docs/lesson-plan.md)
