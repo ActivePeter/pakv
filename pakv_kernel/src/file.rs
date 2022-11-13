@@ -2,6 +2,9 @@ use std::path::{ Path};
 use std::fs::{File, OpenOptions};
 use std::io::{  BufReader, Write, BufRead, Seek, SeekFrom};
 use crate::serial::KvOpe;
+use serde_json::Error;
+use crate::compress::Compresser;
+
 #[derive(Clone)]
 pub struct FilePos{
     pub offset:u64,
@@ -60,6 +63,12 @@ pub struct DbFileHandle{
 }
 
 impl DbFileHandle{
+    pub fn get_w_offset(&self) -> u64 {
+        self.w_offset
+    }
+    pub fn get_r_offset(&self)->u64{
+        self.r_offset
+    }
     pub fn create(path:String)->Option<DbFileHandle>{
         // println!("creare db file at",path);
         let f=OpenOptions::new()
@@ -114,6 +123,7 @@ impl DbFileHandle{
     pub fn append_log(&mut self,log:String)->FilePos{
         self.switch_to_writer_if_is_reader();
         let w=self.dbfile_handle.writer_unwrap().write(log.as_bytes()).unwrap();
+        self.dbfile_handle.writer_unwrap().flush().unwrap();
         let ret=FilePos{
             offset:self.w_offset
         };
@@ -128,7 +138,13 @@ impl DbFileHandle{
         let _n=reader.read_line(&mut line_);
         _n.unwrap();
         // self.fpos.w_offset=fp.w_offset+n.unwrap() as u64;
-        KvOpe::from_str(&*line_).unwrap()
+        match KvOpe::from_str(&*line_){
+            Ok(v) => {v}
+            Err(e) => {
+                eprintln!("f:{},line:{},err:{}",self.dbfile_path,line_,e);
+                unreachable!()
+            }
+        }
     }
     pub fn iter_start(&mut self){
         self.switch_to_reader_if_is_writer();
@@ -148,6 +164,7 @@ impl DbFileHandle{
                 if line_.len()==0{
                     return None
                 }
+
                 Some((serde_json::from_str::<KvOpe>(&*line_).unwrap(),ret))
             },
             Err(e) => {
@@ -155,5 +172,6 @@ impl DbFileHandle{
                 None
             },
         }
+
     }
 }
